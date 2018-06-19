@@ -1,0 +1,429 @@
+'Joel Becker
+'June 16-17, 2018
+'For the Macintosh 512k at Farm Credit Services of America
+'...if I can get it onto double density floppy successfully.
+' This program is meant to be compiled to an application, otherwise it runs too slowly.
+
+DEFINT A-Z
+RANDOMIZE TIMER
+SW%=SYSTEM(5):SH%=SYSTEM(6)
+SW2%=SW%/2:SH2%=SH%/2
+TxtSH%=18:TxtSW%=70
+TxtSH2%=TxtSH%/2:TxtSW2%=TxtSW%/2
+
+tornGDensity!=2!
+TornCollision!=.5
+MinAng!=-3.1416/2
+MaxAng!=3.1416/2
+MinVel!=2!
+MaxVel!=16!
+angChange!=3.1416/180
+velChange!=.5
+CowH=16:CowW=32
+CowH2=CowH/2:CowW2=CowW/2
+BarnH=64:BarnW=64
+BarnX=SW-BarnW:BarnY=(SH-BarnH)/2
+CowMinX=-SW/4:CowMaxX=SW+SW/4
+CowMinY=-SH/4:CowMaxY=SH+SH/4
+DIM tornX(20),tornY(20),tornRad(20),tornG!(20)
+DIM imgBarn%(258) ' 64x64 / 16 + 2
+DIM imgCow%(34) ' 32 x 16 / 16 + 2
+soundOn%=1
+
+GOSUB InitData
+WHILE (1)
+    GOSUB Title
+    GOSUB Instructions
+    GOSUB Game
+WEND
+END
+
+InitData:
+RESTORE BarnData
+CALL ReadImageData(imgBarn%(),BarnW,BarnH,1)
+RESTORE CowData
+CALL ReadImageData(imgCow%(),CowW,CowH,0)
+RETURN
+
+Title:
+CLS
+LOCATE 3,(35-13+1):PRINT "S A V E   T H E   C O W S"
+LOCATE TxtSH%-1,1:PRINT "By Joel Becker"
+PRINT "June 16, 1988...+30";
+
+tRad1!=SW%/4
+tRad2!=tRad1!/4
+ty1!=SH%/4:th!=SH2%:ty2!=ty1!+th!
+tslope!=(tRad2!-tRad1!)/th!
+tAng!=0!
+
+'Draw the tornado
+px!=SH2%+tRad1!:py!=ty1!
+FOR cy!=0 TO th! STEP .8
+    rad!=(tRad1! + cy!*tslope!)
+    x!=SW2%+COS(tAng!)*rad!
+    y!=ty1!+cy!+SIN(tAng!)*rad!*.1
+    LINE (px!,py!)-(x!,y!)
+    px!=x!:py!=y!
+    tAng!=tAng!+.4
+NEXT cy!
+
+' Initialize the tornado cows
+DIM tcowRad!(20),tcowAng!(20),tcowCY!(20)
+ntCows%=10
+FOR c%=1 TO ntCows%
+    y!=RND*SH2% 
+    tcowCY!(c%) = y!+ty1!
+    tcowRad!(c%)= tRad1! + y!*tslope! 'RND*(SH2%-y!)+(SW%/8)
+    tcowAng!(c%)=RND*3.1416*2!
+    CALL DrawTCow(tcowCY!(c%),tcowRad!(c%),tcowAng!(c%))
+NEXT c%
+
+' Animate the tornado cows
+k$=INKEY$
+tcowAngSpeed!=3.1416/18!
+WHILE(INKEY$="")
+    FOR c%=1 TO ntCows%
+        CALL DrawTCow(tcowCY!(c%),tcowRad!(c%),tcowAng!(c%))
+        tcowAng!(c%)=tcowAng!(c%)+tcowAngSpeed!
+        CALL DrawTCow(tcowCY!(c%),tcowRad!(c%),tcowAng!(c%))
+    NEXT c%
+WEND
+ERASE tcowRad!,tcowAng!,tcowCY!
+RETURN
+
+Game:
+CLS
+lvl%=1
+lost%=0
+score%=0
+WHILE (lvl%<=10 AND lost%=0)
+  GOSUB DoLevel
+  lvl%=lvl%+1
+WEND
+IF lost%=1 THEN GOSUB GameOver
+IF won%=1 THEN GOSUB BeatGame
+RETURN
+
+DoLevel:
+GOSUB LevelIntro
+GOSUB InitLevel
+won%=0
+WHILE lost%=0 AND won%=0
+  GOSUB EraseLevel
+  GOSUB MoveLevel
+  GOSUB DrawLevel
+WEND
+CALL Sleep(2#)
+RETURN
+
+GameOver:
+CLS
+LOCATE TxtSH2,TxtSW2-7:PRINT "GAME OVER"
+IF soundOn%=1 THEN SOUND 100,5:SOUND 22000,5:SOUND 75,5:SOUND 22000,5:SOUND 62,5:SOUND 22000,5:SOUND 50,15
+GOSUB WaitKey
+RETURN
+
+BeatGame:
+CLS
+PRINT "Wowy Zowy, you're one cowstanding, agtastic farmer!!"
+PRINT "Thanks for playing!"
+CALL WaitKey()
+RETURN
+
+InitLevel:
+lost%=0:won%=0
+cowsLeft%=3
+cowsDied%=0
+cowsMadeIt%=0
+angle!=0!
+vel!=(MaxVel!+MinVel!)/2!
+cowState$="Waiting" ' Flying, Dead, Barn
+CLS
+CALL UpdateScore(0)
+LOCATE 1,1:PRINT "Level ";lvl%
+LOCATE TxtSH%,1:PRINT "[S] Sound On/Off";
+GOSUB MakeTornados
+GOSUB DrawCowsLeft
+CALL DrawAim(angle!,vel!,1)
+GOSUB DrawBarn
+RETURN
+
+DrawBarn:
+PUT (BarnX,BarnY), imgBarn%,OR
+RETURN
+
+MakeTornados:
+numTorns%=lvl%
+FOR t%=1 TO numTorns%
+    tornX(t%)=INT(RND*(SW%*3/4))+(SW/8)
+    tornY(t%)=INT(RND*(SH%*3/4))+(SH%/8)
+    tornRad(t%)=(INT(RND*3)+3)*(SH%/48)
+    tornG!(t%)=tornRad(t%)*tornRad(t%)*tornGDensity!
+    CALL DrawTorn(tornX(t%), tornY(t%), tornRad(t%))
+NEXT t%
+RETURN
+
+LevelIntro:
+CLS
+LOCATE  TxtSH2%,TxtSW2%-7
+PRINT "Level "+STR$(lvl%)
+GOSUB WaitKey
+RETURN
+
+Instructions:
+CLS
+PRINT
+PRINT
+PRINT "GOAL: THROW all COWS past the TORNADOS, into the BARN for (relative) safety."
+PRINT "You need to get at least one of your cows to safety in each level, otherwise"
+PRINT "what are you gunna use FOR burgers 'n' steaks?"
+PRINT
+PRINT "CONTROLS:"
+PRINT "[Left]/[Right] arrow keys: Set Angle"
+PRINT "[Up]/[Down] arrow keys: Set Velocity
+PRINT "[Space] Throw the next cow
+PRINT
+PRINT "TIP: Use the suction power of the tornados to guide the cows to safety."
+PRINT "Also, don't try this at home."
+PRINT
+PRINT "(Press any key)": GOSUB WaitKey
+RETURN
+
+WaitKey:
+i$=INKEY$
+WHILE INKEY$="":WEND
+RETURN
+
+EraseLevel:
+'CALL DrawAim(angle!,vel!,0)
+RETURN
+
+MoveLevel:
+GOSUB HandleKeys
+GOSUB MoveCows
+RETURN
+
+HandleKeys:
+k$=INKEY$
+IF k$="" THEN RETURN
+IF k$=CHR$(29) AND angle!<MaxAng! THEN 'Right
+  GOSUB EraseAim
+  angle!=angle!+angChange!
+  GOSUB DrawAim
+ELSEIF k$=CHR$(28) AND angle!>MinAng! THEN 'Left
+  GOSUB EraseAim
+  angle!=angle!-angChange!
+  GOSUB DrawAim
+ELSEIF k$=CHR$(30) AND vel!<MaxVel! THEN 'Up
+  GOSUB EraseAim
+  vel!=vel!+velChange!
+  GOSUB DrawAim
+ELSEIF k$=CHR$(31) AND vel!>MinVel! THEN 'Down
+  GOSUB EraseAim
+  vel!=vel!-velChange!
+  GOSUB DrawAim
+ELSEIF k$=" " THEN
+    GOSUB TossCow
+ELSEIF k$="S" OR k$="s" THEN
+    SOUND 440,1
+    IF soundOn%=1 THEN soundOn%=0:ELSE soundOn%=1
+END IF
+RETURN
+
+TossCow:
+IF (cowState$ = "Flying") THEN RETURN
+cowX!=CowW/2:cowY!=(SH%-CowH)/2
+cowState$="Flying"
+cowsLeft%=cowsLeft%-1
+GOSUB DrawCowsLeft
+cowXV!=vel!*COS(angle!)
+cowYV!=vel!*SIN(angle!)
+GOSUB DrawFlyingCow 'Prime the pump so initial cow isn't left behind
+RETURN
+
+DrawFlyingCow:
+PUT (cowX!-CowW2,cowY!-CowH2),imgCow%,XOR
+RETURN
+
+MoveCows:
+IF (cowState$ <> "Flying") THEN RETURN
+FOR t%=1 TO numTorns%
+    dx!=tornX(t%)-cowX!
+    dy!=tornY(t%)-cowY!
+    distSq!=dx!*dx! + dy!*dy!
+    dist!=SQR(distSq!)
+    IF dist! < CowH+(tornRad(t%)*TornCollision!) THEN
+        GOSUB TornadoGotCow
+        RETURN
+    END IF
+    ax!=dx!/(dist!*distSq!) * tornG!(t%)
+    ay!=dy!/(dist!*distSq!) * tornG!(t%)
+    cowXV!=cowXV!+ax!
+    cowYV!=cowYV!+ay!
+NEXT t%
+GOSUB DrawFlyingCow
+cowX!=cowX!+cowXV!
+cowY!=cowY!+cowYV!
+GOSUB DrawFlyingCow
+IF cowX! > BarnX AND cowY! > BarnY AND cowY! < BarnY+BarnH AND cowX! < BarnX+BarnW*2 THEN GOSUB CowMadeIt
+IF cowX! > CowMaxX OR cowX! < CowMinX OR cowY! > CowMaxY OR cowY < CowMinY THEN GOSUB CowWentByeBye
+RETURN
+
+TornadoGotCow:
+GOSUB DrawFlyingCow 'Erase (with XOR)
+IF soundOn%=1 THEN SOUND 200,4:SOUND 140,8
+cowsDied=cowsDied+1
+cowState$="Dead"
+GOSUB CheckLevelDone
+RETURN
+
+CowMadeIt:
+cowsMadeIt%=cowsMadeIt%+1
+CALL UpdateScore(lvl%*100)
+cowState$="Barn"
+GOSUB DrawFlyingCow ' Erase (with XOR)
+GOSUB DrawBarnCowStack
+IF soundOn%=1 THEN SOUND 400,1:SOUND 500,1:SOUND 600,1:SOUND 800,1
+GOSUB CheckLevelDone
+RETURN
+
+DrawBarnCowStack:
+CALL DrawCowStack(BarnX,BarnY,cowsMadeIt%)
+RETURN
+
+DrawCowsLeft:
+CALL DrawCowStack(0,SH2%,cowsLeft%)
+RETURN
+
+CowWentByeBye:
+cowsDied=cowsDied+1
+cowState$="Dead"
+IF soundOn%=1 THEN FOR f%=1600 TO 1400 STEP -20:SOUND f%,2:NEXT f%
+GOSUB CheckLevelDone
+RETURN
+
+EraseAim:
+CALL DrawAim(angle!,vel!,0)
+RETURN
+
+DrawAim:
+CALL DrawAim(angle!,vel!,1)
+RETURN
+
+DrawLevel:
+CALL DrawAim(angle!,vel!,1)
+RETURN
+
+CheckLevelDone:
+    IF cowsLeft%>0 THEN RETURN
+    IF cowsMadeIt%=0 THEN 
+        lost%=1
+    ELSE
+        won%=1
+    END IF
+RETURN
+
+
+BarnData:
+DATA &Hffff,&Hffff,&Hf3ff,&Hffff,&Hffff,&Hffff,&Hc1ff,&Hffff
+DATA &Hffff,&Hffff,&H007f,&Hffff,&Hffff,&Hfff8,&H003f,&Hffff
+DATA &Hffff,&Hfff0,&H000f,&Hffff,&Hffff,&Hfff0,&H0007,&Hffff
+DATA &Hffff,&Hfff0,&H0001,&Hffff,&Hffff,&Hfbf0,&H0000,&H7fff
+DATA &Hffff,&Hfbf0,&H0000,&H3fff,&Hffff,&Hbff0,&H0000,&H0fff
+DATA &Hffff,&Hf7f0,&H0000,&H07ff,&Hfffe,&Hfff0,&H0000,&H01ff
+DATA &Hffef,&Heef0,&H0000,&H007f,&Hfef5,&Hbef0,&H0000,&H003f
+DATA &Hf8fa,&Hdff0,&H0000,&H000f,&He0fd,&Hfef0,&H0000,&H0007
+DATA &He0ee,&Hbef0,&H0000,&H0007,&He0e6,&H7ff0,&H0000,&H0007
+DATA &He0ef,&Hfef0,&H0000,&H0007,&He0ef,&Hf6f0,&H0000,&H0007
+DATA &He0e7,&Hdff0,&H0000,&H0007,&He0ef,&Heef0,&H0000,&H0007
+DATA &He0ef,&Hf6f0,&H0000,&H0007,&He0e3,&Hfbf0,&H0000,&H0007
+DATA &He0ef,&H7cf0,&H0800,&H0007,&He0ef,&Hbcf0,&H1800,&H0007
+DATA &He0ee,&Hfef0,&H1000,&H0007,&He0ef,&Hf7f0,&H1000,&H0007
+DATA &He0fd,&Hb7f0,&H1000,&H0007,&He0ff,&Hc1f0,&H3000,&H0007
+DATA &He0f8,&H1ff0,&H3000,&H0007,&He0f1,&Hffe0,&H2000,&H0007
+DATA &He0ff,&Hf800,&H2000,&H0001,&He0ff,&H0000,&H6000,&H0001
+DATA &He000,&H0000,&H4000,&H0001,&Hf000,&H0000,&H4000,&H0001
+DATA &Hf000,&H0000,&Hc000,&H0003,&Hf000,&H0000,&Hc000,&H0003
+DATA &Hf800,&H0000,&H8000,&H0003,&Hf800,&H0000,&H8000,&H0007
+DATA &Hf800,&H0001,&H8000,&H0007,&Hf800,&H0001,&H8000,&H0007
+DATA &Hfc03,&Hfc01,&H0000,&H0007,&Hfc03,&Hfc01,&H0000,&H0007
+DATA &Hfc02,&Hfc03,&H0000,&H000f,&Hfe02,&Hfc02,&H0000,&H000f
+DATA &Hfe02,&Hfc02,&H0000,&H000f,&Hfe02,&Hfc06,&H0000,&H000f
+DATA &Hfe02,&Hfc06,&H0000,&H001f,&Hff02,&Hfc04,&H0000,&H001f
+DATA &Hff03,&Hfc04,&H0000,&H001f,&Hff00,&H080c,&H0000,&H001f
+DATA &Hff80,&H0018,&H0000,&H003f,&Hffc0,&H0030,&H0000,&H00ff
+DATA &Hffe0,&H0060,&H0000,&H01ff,&Hfff8,&H00e0,&H0000,&H03ff
+DATA &Hfffc,&H01c0,&H0000,&H07ff,&Hfffe,&H0180,&H0000,&H0fff
+DATA &Hffff,&H0300,&H0000,&H3fff,&Hffff,&Hc600,&H0000,&H7fff
+DATA &Hffff,&Hec00,&H00ff,&Hffff,&Hffff,&Hf801,&Hffff,&Hffff
+DATA &Hffff,&Hf07f,&Hffff,&Hffff,&Hffff,&Hffff,&Hffff,&Hffff
+
+CowData:
+' 32x16
+DATA &H0018,&H03c0,&H0018,&H0340,&H0008,&H0140,&H0018,&H0110
+DATA &H0028,&H01b0,&H0028,&H0350,&H006f,&Hfe50,&H00ef,&Hfe50
+DATA &H00ef,&Hde50,&H01e3,&Hfc50,&H03f7,&Hef30,&H07f3,&Hf770
+DATA &H05f1,&Hff70,&H05e7,&Hffa0,&H1def,&He980,&H0cc0,&H0000
+
+
+SUB Sleep(s#) STATIC
+    endt#=TIMER+s#
+    WHILE (TIMER < endt#):WEND
+END SUB
+
+SUB DrawTCow(cy!, rad!, ang!) STATIC
+    SHARED imgCow%(),SW2%
+    x!=SW2%+COS(ang!)*rad!
+    y!=cy!+SIN(ang!)*rad!*.1
+    PUT (x!-CowW2,y!-CowH2),imgCow%,XOR
+END SUB
+
+SUB UpdateScore(points%) STATIC
+    SHARED score%,TxtSW%
+    score%=score%+points%
+    LOCATE 1,TxtSW%-25:PRINT "Score: ";STR$(score%)
+END SUB
+
+SUB DrawCowStack(x%,y%,nCows%) STATIC
+SHARED imgCow%(),CowW,CowH
+    LINE(x%,y%)-(x%+CowW,y%-CowH*8),0,BF
+    FOR c%=1 TO nCows%
+        cy%=y% - (c%+1)*CowH
+        PUT (x%,cy%), imgCow%,OR
+    NEXT c%
+END SUB
+
+SUB DrawTorn(x%,y%,rad%) STATIC
+    arcLen!=3.1416/2
+    FOR r%=1 TO rad%
+        s!=RND*3.1416*2
+        CIRCLE (x%,y%),r%,1,s!,s!+arcLen!
+    NEXT r%
+END SUB
+
+SUB DrawAim(ang!,vel!,c%) STATIC
+    x%=0:y%=SYSTEM(6)/2
+    stR=16:enR=16+vel!*8
+    enX=x%+COS(ang!)*enR
+    enY=y%+SIN(ang!)*enR
+    LINE (x%+COS(ang!)*stR, y%+SIN(ang!)*stR)-(enX,enY),c%
+END SUB
+
+
+SUB ReadImageData(img%(1),w%,h%,invert%) STATIC
+    img%(0)=w%
+    img%(1)=h%
+    ww%=w%/16
+    words%=w%*h%/16
+    FOR y%=h%-1 TO 0 STEP -1
+        FOR x%=0 TO ww%-1
+            idx%=y%*ww%+x%+2
+            READ img%(idx%)
+        NEXT x%
+    NEXT y%
+    IF invert%=1 THEN
+        FOR i%=0 TO words%-1:img%(i%+2)=NOT img%(i%+2):NEXT i%
+    END IF
+END SUB
+
