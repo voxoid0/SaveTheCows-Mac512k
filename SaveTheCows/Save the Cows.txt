@@ -5,7 +5,7 @@
 ' This program is meant to be compiled to an application, otherwise it runs too slowly.
 
 DEFINT A-Z
-RANDOMIZE TIMER
+RANDOMIZE 3 'TIMER
 SW%=SYSTEM(5):SH%=SYSTEM(6)
 SW2%=SW%/2:SH2%=SH%/2
 TxtSH%=18:TxtSW%=70
@@ -15,10 +15,11 @@ tornGDensity!=2!
 TornCollision!=.5
 MinAng!=-3.1416/2
 MaxAng!=3.1416/2
-MinVel!=2!
-MaxVel!=16!
-angChange!=3.1416/180
-velChange!=.5
+MinVel!=1!
+MaxVel!=4!
+angChange!=3.1416/180*2
+fineAngChange!=3.1416/180/10
+velChange!=.25
 CowH=16:CowW=32
 CowH2=CowH/2:CowW2=CowW/2
 BarnH=64:BarnW=64
@@ -31,6 +32,7 @@ DIM imgCow%(34) ' 32 x 16 / 16 + 2
 soundOn%=1
 
 GOSUB InitData
+'GOTO BeatGame
 WHILE (1)
     GOSUB Title
     GOSUB Instructions
@@ -94,7 +96,7 @@ RETURN
 
 Game:
 CLS
-lvl%=1
+lvl%=10
 lost%=0
 score%=0
 WHILE (lvl%<=10 AND lost%=0)
@@ -128,8 +130,8 @@ BeatGame:
 CLS
 PRINT "Wowy Zowy, you're one cowstanding, agtastic farmer!!"
 PRINT "Thanks for playing!"
-CALL WaitKey()
-RETURN
+GOSUB WaitKey
+END
 
 InitLevel:
 lost%=0:won%=0
@@ -137,15 +139,15 @@ cowsLeft%=3
 cowsDied%=0
 cowsMadeIt%=0
 angle!=0!
-vel!=(MaxVel!+MinVel!)/2!
+Vel!=MaxVel! '(MaxVel!+MinVel!)/2!
 cowState$="Waiting" ' Flying, Dead, Barn
 CLS
 CALL UpdateScore(0)
 LOCATE 1,1:PRINT "Level ";lvl%
-LOCATE TxtSH%,1:PRINT "[S] Sound On/Off";
-GOSUB MakeTornados
+LOCATE TxtSH%,TxtSW%-16:PRINT "[S] Sound On/Off";
+GOSUB LoadTornados ' RandomizeTornados
 GOSUB DrawCowsLeft
-CALL DrawAim(angle!,vel!,1)
+CALL DrawAim(angle!,Vel!,1)
 GOSUB DrawBarn
 RETURN
 
@@ -153,12 +155,34 @@ DrawBarn:
 PUT (BarnX,BarnY), imgBarn%,OR
 RETURN
 
-MakeTornados:
-numTorns%=lvl%
+RandomizeTornados:
+numTorns%=lvl%+5
+LOCATE 2,1
 FOR t%=1 TO numTorns%
     tornX(t%)=INT(RND*(SW%*3/4))+(SW/8)
     tornY(t%)=INT(RND*(SH%*3/4))+(SH%/8)
-    tornRad(t%)=(INT(RND*3)+3)*(SH%/48)
+    s%=INT(RND*3)
+    tornRad(t%)=(s%+3)*(SH%/48)
+    tornG!(t%)=tornRad(t%)*tornRad(t%)*tornGDensity!
+    CALL DrawTorn(tornX(t%), tornY(t%), tornRad(t%))
+    'PRINT TAB(5);"DATA ";tornX(t%)/SW;","tornY(t%)/SH;",";s%
+NEXT t%
+RETURN
+
+LoadTornados:
+RESTORE LevelData
+' Skip to current level's data
+FOR l%=1 TO lvl%-1
+    READ numTorns%
+    FOR t%=1 TO numTorns%:READ x!,y!,s%:NEXT t%
+NEXT l%
+'Load current level
+READ numTorns%
+FOR t%=1 TO numTorns%
+    READ x!,y!,s%
+    tornX(t%)=INT(x!*SW)
+    tornY(t%)=INT(y!*SH)
+    tornRad(t%)=(s%+2)*(SH%/48)
     tornG!(t%)=tornRad(t%)*tornRad(t%)*tornGDensity!
     CALL DrawTorn(tornX(t%), tornY(t%), tornRad(t%))
 NEXT t%
@@ -205,23 +229,39 @@ GOSUB MoveCows
 RETURN
 
 HandleKeys:
-k$=INKEY$
+k$=UCASE$(INKEY$)
 IF k$="" THEN RETURN
 IF k$=CHR$(29) AND angle!<MaxAng! THEN 'Right
   GOSUB EraseAim
   angle!=angle!+angChange!
   GOSUB DrawAim
+ELSEIF k$="A" AND angle!>MinAng! THEN 'Left
+  GOSUB EraseAim
+  angle!=angle!-fineAngChange!
+  GOSUB DrawAim
+ELSEIF k$="D" AND angle!<MaxAng! THEN 'Right
+  GOSUB EraseAim
+  angle!=angle!+fineAngChange!
+  GOSUB DrawAim
 ELSEIF k$=CHR$(28) AND angle!>MinAng! THEN 'Left
   GOSUB EraseAim
   angle!=angle!-angChange!
   GOSUB DrawAim
-ELSEIF k$=CHR$(30) AND vel!<MaxVel! THEN 'Up
+ELSEIF k$=CHR$(30) AND Vel!<MaxVel! THEN 'Up
   GOSUB EraseAim
-  vel!=vel!+velChange!
+  Vel!=Vel!+velChange!
   GOSUB DrawAim
-ELSEIF k$=CHR$(31) AND vel!>MinVel! THEN 'Down
+ELSEIF k$=CHR$(31) AND Vel!>MinVel! THEN 'Down
   GOSUB EraseAim
-  vel!=vel!-velChange!
+  Vel!=Vel!-velChange!
+  GOSUB DrawAim
+ELSEIF k$="W" AND Vel!<MaxVel! THEN 'Up
+  GOSUB EraseAim
+  Vel!=Vel!+fineVelChange!
+  GOSUB DrawAim
+ELSEIF k$="S" AND Vel!>MinVel! THEN 'Down
+  GOSUB EraseAim
+  Vel!=Vel!-fineVelChange!
   GOSUB DrawAim
 ELSEIF k$=" " THEN
     GOSUB TossCow
@@ -237,8 +277,8 @@ cowX!=CowW/2:cowY!=(SH%-CowH)/2
 cowState$="Flying"
 cowsLeft%=cowsLeft%-1
 GOSUB DrawCowsLeft
-cowXV!=vel!*COS(angle!)
-cowYV!=vel!*SIN(angle!)
+cowXV!=Vel!*COS(angle!)
+cowYV!=Vel!*SIN(angle!)
 GOSUB DrawFlyingCow 'Prime the pump so initial cow isn't left behind
 RETURN
 
@@ -304,15 +344,15 @@ GOSUB CheckLevelDone
 RETURN
 
 EraseAim:
-CALL DrawAim(angle!,vel!,0)
+CALL DrawAim(angle!,Vel!,0)
 RETURN
 
 DrawAim:
-CALL DrawAim(angle!,vel!,1)
+CALL DrawAim(angle!,Vel!,1)
 RETURN
 
 DrawLevel:
-CALL DrawAim(angle!,vel!,1)
+CALL DrawAim(angle!,Vel!,1)
 RETURN
 
 CheckLevelDone:
@@ -324,6 +364,63 @@ CheckLevelDone:
     END IF
 RETURN
 
+LevelData:
+' Level 1
+DATA 1
+DATA 0.5,0.5,2
+' Level 2
+DATA 2
+DATA 0.25,0.6,2
+DATA 0.75,0.4,1
+'Level 3
+DATA 3
+DATA 0.3,0.67,1
+DATA 0.5,0.5,1
+DATA 0.7,0.67,1
+' Level 4
+DATA 2
+DATA 0.4,0.25,3
+DATA 0.6,0.66,1
+' Level 5
+DATA 3
+DATA 0.8,0.4,2
+DATA 0.8,0.6,1
+DATA 0.4,0.75,2
+' Level 6
+DATA 3
+DATA 0.25,0.6,2
+DATA 0.4,0.3,1
+DATA 0.6,0.7,1
+'Level 7
+DATA 4
+DATA 0.25, 0.25, 3
+DATA 0.35, 0.75, 3
+DATA 0.65, 0.25, 3
+DATA 0.75, 0.75, 3
+'Level 8
+DATA 5
+DATA 0.3,0.3,1
+DATA 0.7,0.3,1
+DATA 0.5,0.5,2
+DATA 0.3,0.7,1
+DATA 0.7,0.7,1
+'Level 9
+DATA 5
+DATA 0.25, 0.4, 3
+DATA 0.35, 0.75, 3
+DATA 0.65, 0.25, 3
+DATA 0.9, 0.05, 3
+DATA 0.88,0.5,1
+'Level 10
+'DATA 1
+'DATA 0.23,0.5,1
+DATA 6
+DATA 0.28,0.6,2
+DATA 0.15,0.7,2
+DATA 0.5,0.5,3
+DATA 0.4,0.6,3
+DATA 0.65,0.62,3
+DATA 0.95,0.7,2
 
 BarnData:
 DATA &Hffff,&Hffff,&Hf3ff,&Hffff,&Hffff,&Hffff,&Hc1ff,&Hffff
@@ -373,7 +470,7 @@ SUB Sleep(s#) STATIC
 END SUB
 
 SUB DrawTCow(cy!, rad!, ang!) STATIC
-    SHARED imgCow%(),SW2%
+    SHARED imgCow%(),SW2%,CowW2,CowH2
     x!=SW2%+COS(ang!)*rad!
     y!=cy!+SIN(ang!)*rad!*.1
     PUT (x!-CowW2,y!-CowH2),imgCow%,XOR
@@ -402,14 +499,21 @@ SUB DrawTorn(x%,y%,rad%) STATIC
     NEXT r%
 END SUB
 
-SUB DrawAim(ang!,vel!,c%) STATIC
+SUB DrawAim(ang!,Vel!,c%) STATIC
+    SHARED TxtSW%,TxtSH%
+    
     x%=0:y%=SYSTEM(6)/2
-    stR=16:enR=16+vel!*8
+    stR=16:enR=16+Vel!*8
     enX=x%+COS(ang!)*enR
     enY=y%+SIN(ang!)*enR
     LINE (x%+COS(ang!)*stR, y%+SIN(ang!)*stR)-(enX,enY),c%
+    
+    LOCATE TxtSH%,1
+    PRINT "Ang ";
+    PRINT USING "###.#";-ang!*180/3.1416;
+    PRINT ", Vel ";
+    PRINT USING "##.##";Vel!;
 END SUB
-
 
 SUB ReadImageData(img%(1),w%,h%,invert%) STATIC
     img%(0)=w%
