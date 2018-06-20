@@ -4,14 +4,15 @@
 '...if I can get it onto double density floppy successfully.
 ' This program is meant to be compiled to an application, otherwise it runs too slowly.
 
-DEFINT A-Z
+DEFINT a-Z
 RANDOMIZE 3 'TIMER
 SW%=SYSTEM(5):SH%=SYSTEM(6)
 SW2%=SW%/2:SH2%=SH%/2
 TxtSH%=18:TxtSW%=70
 TxtSH2%=TxtSH%/2:TxtSW2%=TxtSW%/2
 
-tornGDensity!=2!
+speed!=4!
+tornGDensity!=2!*speed!*speed!
 TornCollision!=.5
 MinAng!=-3.1416/2
 MaxAng!=3.1416/2
@@ -83,7 +84,7 @@ NEXT c%
 
 ' Animate the tornado cows
 k$=INKEY$
-tcowAngSpeed!=3.1416/18!
+tcowAngSpeed!=3.1416/18!*speed!
 WHILE(INKEY$="")
     FOR c%=1 TO ntCows%
         CALL DrawTCow(tcowCY!(c%),tcowRad!(c%),tcowAng!(c%))
@@ -96,7 +97,7 @@ RETURN
 
 Game:
 CLS
-lvl%=10
+lvl%=1
 lost%=0
 score%=0
 WHILE (lvl%<=10 AND lost%=0)
@@ -125,13 +126,6 @@ LOCATE TxtSH2,TxtSW2-7:PRINT "GAME OVER"
 IF soundOn%=1 THEN SOUND 100,5:SOUND 22000,5:SOUND 75,5:SOUND 22000,5:SOUND 62,5:SOUND 22000,5:SOUND 50,15
 GOSUB WaitKey
 RETURN
-
-BeatGame:
-CLS
-PRINT "Wowy Zowy, you're one cowstanding, agtastic farmer!!"
-PRINT "Thanks for playing!"
-GOSUB WaitKey
-END
 
 InitLevel:
 lost%=0:won%=0
@@ -277,8 +271,8 @@ cowX!=CowW/2:cowY!=(SH%-CowH)/2
 cowState$="Flying"
 cowsLeft%=cowsLeft%-1
 GOSUB DrawCowsLeft
-cowXV!=Vel!*COS(angle!)
-cowYV!=Vel!*SIN(angle!)
+cowXV!=Vel!*COS(angle!)*speed!
+cowYV!=Vel!*SIN(angle!)*speed!
 GOSUB DrawFlyingCow 'Prime the pump so initial cow isn't left behind
 RETURN
 
@@ -302,11 +296,13 @@ FOR t%=1 TO numTorns%
     cowXV!=cowXV!+ax!
     cowYV!=cowYV!+ay!
 NEXT t%
-GOSUB DrawFlyingCow
+'GOSUB DrawFlyingCow
+PUT (cowX!-CowW2,cowY!-CowH2),imgCow%,XOR
 cowX!=cowX!+cowXV!
 cowY!=cowY!+cowYV!
-GOSUB DrawFlyingCow
-IF cowX! > BarnX AND cowY! > BarnY AND cowY! < BarnY+BarnH AND cowX! < BarnX+BarnW*2 THEN GOSUB CowMadeIt
+PUT (cowX!-CowW2,cowY!-CowH2),imgCow%,XOR
+'GOSUB DrawFlyingCow
+IF cowX! > BarnX-CowW2 AND cowY! > BarnY-CowH2 AND cowY! < BarnY+BarnH+CowH2 AND cowX! < BarnX+BarnW+CowW2 THEN GOSUB CowMadeIt
 IF cowX! > CowMaxX OR cowX! < CowMinX OR cowY! > CowMaxY OR cowY < CowMinY THEN GOSUB CowWentByeBye
 RETURN
 
@@ -419,7 +415,7 @@ DATA 0.28,0.6,2
 DATA 0.15,0.7,2
 DATA 0.5,0.5,3
 DATA 0.4,0.6,3
-DATA 0.65,0.62,3
+DATA 0.67,0.62,3
 DATA 0.95,0.7,2
 
 BarnData:
@@ -463,6 +459,187 @@ DATA &H0028,&H01b0,&H0028,&H0350,&H006f,&Hfe50,&H00ef,&Hfe50
 DATA &H00ef,&Hde50,&H01e3,&Hfc50,&H03f7,&Hef30,&H07f3,&Hf770
 DATA &H05f1,&Hff70,&H05e7,&Hffa0,&H1def,&He980,&H0cc0,&H0000
 
+' *************************************
+BeatGame: 
+CLS
+LINE (0,SH2)-(SW,SH2)
+PUT (SW2-BarnW/2,SH2-BarnH/2),imgBarn%,PSET
+DIM ecowx%(15),ecowy%(15)
+nCows%=15
+dance%=4
+RANDOMIZE 2
+FOR c%=1 TO nCows%
+    ecowx%(c%)=INT(RND*(SW-CowW))
+    ecowy%(c%)=INT(RND*(SH/4))+(SH2)
+    PUT (ecowx%(c%)-dance%,ecowy%(c%)),imgCow%,XOR
+NEXT c%
+' Fence
+LINE(0,SH-64)-(SW,SH-64)
+LINE (0,SH-56)-(SW,SH-56)
+FOR x%=8 TO SW STEP 36:LINE(x%,SH-68)-(x%,SH-52):NEXT x%
+' Sun
+sunx=SW*.75:suny=SH2-64
+CIRCLE(sunx, suny),32
+FOR a!=0! TO 6.28 STEP 3.14/6
+    LINE (sunx + COS(a!)*36,suny + SIN(a!)*36)-(sunx + COS(a!)*48,suny + SIN(a!)*48)
+NEXT a!
+
+'PRINT "Wowy Zowy, you're one cowstanding, agtastic farmer!!"
+'PRINT "Thanks for playing!"
+
+BeatGameInitMusic:
+DIM r%(4)
+    RESTORE BeatGameInitMusic
+    '    F#() contains frequencies for notes in the diatonic scale
+    '    octave 0, note A = F#(12) = 55 Hz
+    DIM f#(88)
+    Log2of27.5# = LOG(27.5#)/LOG(2#)
+    FOR x%=1 TO 88
+        f#(x%) = 2^(Log2of27.5# + x%/12#)
+    NEXT x%
+
+    '    Build fundamental wave form
+    '    Controls the quality of the sound
+    DIM Timbre(255)
+    FOR i=0 TO 255
+        READ Timbre(i)
+    NEXT i
+
+'These DATA statements were created with the following formula
+'Reading these is much faster than executing SIN 1024 times
+'   K#=2*3.14159265/256
+'   FOR I=0 TO 255
+'      Timbre(I)=31*(SIN(I*K#)+SIN(2*I*K#)+SIN(3*I*K#)+SIN(4*I*K#))
+'   NEXT I
+DATA 0, 8, 15, 23, 30, 37, 44, 51, 57, 63, 69, 74, 79, 83, 87, 91
+DATA 93, 96, 98, 99, 100, 100, 100, 99, 98, 97, 95, 92, 89, 86, 83, 79
+DATA 75, 71, 66, 62, 57, 52, 48, 43, 39, 34, 30, 25, 21, 18, 14, 11
+DATA 8, 5, 3, 0,-1,-3,-4,-5,-5,-6,-6,-5,-5,-4,-3,-1
+DATA 0, 2, 3, 5, 7, 9, 11, 13, 15, 17, 18, 20, 21, 23, 24, 25
+DATA 26, 26, 27, 27, 27, 27, 27, 26, 25, 24, 23, 22, 20, 18, 17, 15
+DATA 13, 11, 9, 7, 5, 3, 1,-1,-3,-5,-6,-8,-9,-10,-11,-12
+DATA -12,-13,-13,-13,-13,-13,-12,-11,-11,-10,-8,-7,-6,-4,-3,-2
+DATA 0, 2, 3, 4, 6, 7, 8, 10, 11, 11, 12, 13, 13, 13, 13, 13
+DATA 12, 12, 11, 10, 9, 8, 6, 5, 3, 1,-1,-3,-5,-7,-9,-11
+DATA -13,-15,-17,-18,-20,-22,-23,-24,-25,-26,-27,-27,-27,-27,-27,-26
+DATA -26,-25,-24,-23,-21,-20,-18,-17,-15,-13,-11,-9,-7,-5,-3,-2
+DATA 0, 1, 3, 4, 5, 5, 6, 6, 5, 5, 4, 3, 1, 0,-3,-5
+DATA -8,-11,-14,-18,-21,-25,-30,-34,-39,-43,-48,-52,-57,-62,-66,-71
+DATA -75,-79,-83,-86,-89,-92,-95,-97,-98,-99,-100,-100,-100,-99,-98,-96
+DATA -93,-91,-87,-83,-79,-74,-69,-63,-57,-51,-44,-37,-30,-23,-15,-8
+
+    WAVE 0,Timbre
+    WAVE 1,Timbre
+    WAVE 2,Timbre
+    WAVE 3,Timbre
+
+    '    Array CF maps MML commands to frequency indices
+    c$ = "cdefgabp#-12346890<>l"
+    DIM CF(21)
+    FOR i=1 TO 21
+        READ CF(i)
+    NEXT i
+    DATA 0,2,4,5,7,9,11,0,1,-1, 0,0,0,0,0,0,0,0, -12,12,0
+
+    '    Array CT# maps MML commands to duration values
+    DIM CT#(20)
+    FOR i=1 TO 20
+        READ CT#(i)
+    NEXT i
+    '    p1,p2,p3,p4,p6,p8 correspond to 36.4 ... 4.55 time units
+    DATA 0,0,0,0,0,0,0,0,0,0, 36.4,18.2,12.133333,9.1,6.0666667,4.55, 2.275,1.1375,0,0,0
+
+RePlay:
+SOUND RESUME
+RESTORE Song
+
+'    Array VO contains the default octave for a voice
+FOR v=0 TO 3
+  READ VO(v)
+  VO(v)=12*VO(v) + 3
+NEXT v
+BeatGameMusicLoop:
+    IF (INKEY$=CHR$(27)) THEN END
+    FOR c%=1 TO nCows%
+        PUT (ecowx%(c%)-dance%,ecowy%(c%)),imgCow%,XOR
+        PUT (ecowx%(c%)+dance%,ecowy%(c%)),imgCow%,XOR
+    NEXT c%
+    dance%=-dance%
+    
+    SOUND WAIT
+    FOR v=0 TO 3
+        t#=VT#(v)
+        Fi=-1
+        READ p$
+        IF p$="x" THEN RePlay
+        FOR i=1 TO LEN(p$)
+            Ci=INSTR(c$,MID$(p$,i,1))
+            IF Ci>8 THEN 10
+                IF Fi>=0 THEN SOUND f#(Fi),t#,,v: t#=VT#(v)
+                IF Ci=8 THEN Fi=0 ELSE Fi=CF(Ci)+VO(v)
+                GOTO 50
+10        IF Ci<11 THEN Fi=Fi+CF(Ci): GOTO 50  '# or -
+            IF Ci<19 THEN t#=CT#(Ci): GOTO 50  '1 through 8
+            IF Ci<21 THEN VO(v)=VO(v)+CF(Ci): GOTO 50  '< or >
+            i=i+1  'ln
+            VT#(v)=CT#(INSTR(c$,MID$(p$,i,1)))
+            IF Fi<0 THEN t#=VT#(v)
+50    NEXT i
+        IF Fi>=0 THEN SOUND f#(Fi),t#,,v
+    NEXT v
+    SOUND RESUME
+    GOTO BeatGameMusicLoop
+
+'    1st 4 numbers are the default octave for each voice (0-7)
+'    ln changes the duration for subsequent notes in this voice.
+'    l1 = full note, l2 = half note, l4 = quarter notes etc.
+'    > increments the octave for this voice
+'    < decrements the octave for this voice
+'    a through g plays that note.
+'    They may be followed by # (sharp) or -(flat).
+'    They may also be followed by a digit which specifies
+'    the duration for that note.
+'    p causes a pause, or rest.
+
+Song:
+DATA 1,3,3,3
+
+'Section 1
+DATA l4gb,l9pgb>cc#deg,l2p,l2p
+DATA >cc#,gdege<b-ag,l2p,l2p
+DATA de,b>cc#d<bged,l2p,l2p
+DATA l8<al9p>dpl8<dl9p,egeb-pl8al9p,l9pppc#pl8cl9p,l2p
+
+DATA l4gb,l9pgb>cc#deg,l2p,l2p
+DATA >cc#,gdege<b-ag,l2p,l2p
+DATA de,b>cc#d<bged,l2p,l2p
+DATA l9<a>dpl4<gl9p,b-apl4gl9p,l9c#cpl4<bl9p>,l2p
+
+DATA <l9gp>gp<bp>bp,l9pgb>cc#deg,l2p,l2p
+DATA <>cp>cp<c#p>c#p,gdege<b-ag,l2p,l2p
+DATA <dp>dp<ep>ep,b>cc#d<bged,l2p,l2p
+DATA <l9<a>ap>dpl8<dl9p,egeb-pl8al9p,l9pppc#pl8cl9p,l2p
+
+DATA <l9gp>gp<bp>bp,l9pgb>cc#deg,l2p,l2p
+DATA <>cp>cp<c#p>c#p,gdege<b-ag,l2p,l2p
+DATA <dp>dp<ep>ep,b>cc#d<bged,l2p,l2p
+DATA l9<adpl4gl9p,b-apl4gl9p,l9c#cpl8<bl9ged,l2p
+
+' Section 2
+DATA l9cppcpppp,l9cppcppp,l9egpgpged,l9eppepppp
+DATA c#ppc#pppp,<b-ppb-pppp,egpgpged,eppepppp
+DATA dppdppp,bppbpppp,b>dpdpd#ef,gppgpppp
+DATA <g>gl8fed,>>c#ddpl8ef,fee-d<b-aa-g,l8gggg
+
+DATA l9cppcpppp,l9cppcppp,l9gepgpded,l9eppepppp
+DATA c#ppc#pppp,<b-ppb-pppp,gepgpede,eppepppp
+DATA dppdppp,bppbpppp,b>dpdpdpd,gppgpppp
+DATA ddpdpdpdl2>>d,l2df#,f#f#pf#pf#pf#l2>c,>ddpdpdpdl2f
+DATA l9<d<a>cdc<a-gf#,l2p,l2p,l2p
+DATA dfd<c>c<c#>c#d,l2p,l2p,l2p
+
+DATA x
+' *************************************
 
 SUB Sleep(s#) STATIC
     endt#=TIMER+s#
