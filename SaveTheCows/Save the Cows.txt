@@ -22,7 +22,7 @@ angChange!=3.1416/180*2
 fineAngChange!=3.1416/180/10
 velChange!=.25
 CowH=16:CowW=32
-CowH2=CowH/2:CowW2=CowW/2
+CowH2=CowH/2:cowW2=CowW/2
 BarnH=64:BarnW=64
 BarnX=SW-BarnW:BarnY=(SH-BarnH)/2
 CowMinX=-SW/4:CowMaxX=SW+SW/4
@@ -62,7 +62,7 @@ tAng!=0!
 
 'Draw the tornado
 px!=SH2%+tRad1!:py!=ty1!
-FOR cy!=0 TO th! STEP .8
+FOR cy!=0 TO th! STEP 1.6 '.8
     rad!=(tRad1! + cy!*tslope!)
     x!=SW2%+COS(tAng!)*rad!
     y!=ty1!+cy!+SIN(tAng!)*rad!*.1
@@ -180,6 +180,24 @@ FOR t%=1 TO numTorns%
     tornG!(t%)=tornRad(t%)*tornRad(t%)*tornGDensity!
     CALL DrawTorn(tornX(t%), tornY(t%), tornRad(t%))
 NEXT t%
+
+PrecalcForces:
+DIM lax!(128, 86),lay!(128,86)
+FOR y%=2 TO SH-1 STEP 4
+PSET (SW2,y%)
+FOR x%=2 TO SW-1 STEP 4
+gx%=x%/4:gy%=y%/4
+lax!(gx%,gy%)=0:lay!(gx%,gy%)=0
+FOR t%=1 TO numTorns%
+    dx!=tornX(t%)-x%
+    dy!=tornY(t%)-y%
+    distSq!=dx!*dx! + dy!*dy!
+    dist!=SQR(distSq!)
+    ax!=dx!/(dist!*distSq!) * tornG!(t%)
+    ay!=dy!/(dist!*distSq!) * tornG!(t%)
+    lax!(gx%,gy%) = lax!(gx%,gy%) + ax!
+    lay!(gx%,gy%) = lay!(gx%,gy%) + ay!
+NEXT t%,x%,y%
 RETURN
 
 LevelIntro:
@@ -277,10 +295,10 @@ GOSUB DrawFlyingCow 'Prime the pump so initial cow isn't left behind
 RETURN
 
 DrawFlyingCow:
-PUT (cowX!-CowW2,cowY!-CowH2),imgCow%,XOR
+PUT (cowX!-cowW2,cowY!-CowH2),imgCow%,XOR
 RETURN
 
-MoveCows:
+MoveCowsOld:
 IF (cowState$ <> "Flying") THEN RETURN
 FOR t%=1 TO numTorns%
     dx!=tornX(t%)-cowX!
@@ -296,13 +314,28 @@ FOR t%=1 TO numTorns%
     cowXV!=cowXV!+ax!
     cowYV!=cowYV!+ay!
 NEXT t%
+
+MoveCows:
+IF (cowState$ <> "Flying") THEN RETURN
+FOR t%=1 TO numTorns%
+    dx%=tornX(t%)-INT(cowX!)
+    dy%=tornY(t%)-INT(cowY!)
+    distSq%=dx%*dx% + dy%*dy%
+    IF (distSq% < CowH+(tornRad(t%)*TornCollision!)) THEN
+    'IF dist! < CowH+(tornRad(t%)*TornCollision!) THEN
+        GOSUB TornadoGotCow
+        RETURN
+    END IF
+NEXT t%
+cowXV! = cowXV! + lax!(INT(cowX!)/4)
+cowYV! = cowYV! + lay!(INT(cowY!)/4)
 'GOSUB DrawFlyingCow
-PUT (cowX!-CowW2,cowY!-CowH2),imgCow%,XOR
+PUT (cowX!-cowW2,cowY!-CowH2),imgCow%,XOR
 cowX!=cowX!+cowXV!
 cowY!=cowY!+cowYV!
-PUT (cowX!-CowW2,cowY!-CowH2),imgCow%,XOR
+PUT (cowX!-cowW2,cowY!-CowH2),imgCow%,XOR
 'GOSUB DrawFlyingCow
-IF cowX! > BarnX-CowW2 AND cowY! > BarnY-CowH2 AND cowY! < BarnY+BarnH+CowH2 AND cowX! < BarnX+BarnW+CowW2 THEN GOSUB CowMadeIt
+IF cowX! > BarnX-cowW2 AND cowY! > BarnY-CowH2 AND cowY! < BarnY+BarnH+CowH2 AND cowX! < BarnX+BarnW+cowW2 THEN GOSUB CowMadeIt
 IF cowX! > CowMaxX OR cowX! < CowMinX OR cowY! > CowMaxY OR cowY < CowMinY THEN GOSUB CowWentByeBye
 RETURN
 
@@ -647,10 +680,10 @@ SUB Sleep(s#) STATIC
 END SUB
 
 SUB DrawTCow(cy!, rad!, ang!) STATIC
-    SHARED imgCow%(),SW2%,CowW2,CowH2
+    SHARED imgCow%(),SW2%,cowW2,CowH2
     x!=SW2%+COS(ang!)*rad!
     y!=cy!+SIN(ang!)*rad!*.1
-    PUT (x!-CowW2,y!-CowH2),imgCow%,XOR
+    PUT (x!-cowW2,y!-CowH2),imgCow%,XOR
 END SUB
 
 SUB UpdateScore(points%) STATIC
