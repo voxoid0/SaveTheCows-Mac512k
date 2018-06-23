@@ -33,7 +33,7 @@ DIM imgCow%(34) ' 32 x 16 / 16 + 2
 soundOn%=1
 
 GOSUB InitData
-'GOTO BeatGame
+GOTO BeatGame
 WHILE (1)
     GOSUB Title
     GOSUB Instructions
@@ -91,7 +91,8 @@ NEXT c%
 ' Animate the tornado cows
 k$=INKEY$
 tcowAngSpeed!=3.1416/18!*speed!
-WHILE(INKEY$="")
+WHILE (MOUSE(0)=-1):WEND
+WHILE(INKEY$="" AND MOUSE(0)=0)
     FOR c%=1 TO ntCows%
         CALL DrawTCow(tcowCY!(c%),tcowRad!(c%),tcowAng!(c%))
         tcowAng!(c%)=tcowAng!(c%)+tcowAngSpeed!
@@ -103,7 +104,7 @@ RETURN
 
 Game:
 CLS
-lvl%=1
+lvl%=8
 lost%=0
 score%=0
 WHILE (lvl%<=10 AND lost%=0)
@@ -139,7 +140,7 @@ cowsLeft%=3
 cowsDied%=0
 cowsMadeIt%=0
 angle!=0!
-Vel!=MaxVel! '(MaxVel!+MinVel!)/2!
+vel!=MaxVel! '(MaxVel!+MinVel!)/2!
 cowState$="Waiting" ' Flying, Dead, Barn
 CLS
 CALL UpdateScore(0)
@@ -147,7 +148,7 @@ LOCATE 1,1:PRINT "Level ";lvl%
 LOCATE TxtSH%,TxtSW%-24:PRINT "[S] Sound On/Off";
 GOSUB LoadTornados ' RandomizeTornados
 GOSUB DrawCowsLeft
-CALL DrawAim(angle!,Vel!,1)
+CALL DrawAim(angle!,vel!,1)
 GOSUB DrawBarn
 RETURN
 
@@ -312,7 +313,9 @@ RETURN
 
 WaitKey:
 i$=INKEY$
-WHILE INKEY$="":WEND
+WHILE INKEY$<>"" OR MOUSE(0)<>0:WEND
+WHILE INKEY$="" AND MOUSE(0)=0:WEND
+WHILE MOUSE(0)=-1:WEND
 RETURN
 
 EraseLevel:
@@ -320,11 +323,36 @@ EraseLevel:
 RETURN
 
 MoveLevel:
-GOSUB HandleKeys
+'GOSUB HandleKeys
+GOSUB HandleMouse
 GOSUB MoveCow
 RETURN
 
+HandleMouse:
+IF (cowState$="Flying") THEN RETURN
+IF MOUSE(0)=-1 THEN 
+    GOSUB TossCow
+ELSE
+    GOSUB EraseAim
+    dx=MOUSE(1)
+    dy=MOUSE(2)-SH2
+    IF dx=0 THEN
+        IF dy>0 THEN angle!=3.1416/2 ELSE angle!=-3.1416/2
+    ELSE
+        angle!=ATN(dy/dx)
+    END IF
+    angle!=INT(angle!*90/3.1416)*3.1416/90
+    
+    vel!=INT(SQR(dx*dx+dy*dy)/(SH/3)*MaxVel!*4)/4!
+    IF (vel! < MinVel!) THEN vel!=MinVel!
+    IF (vel! > MaxVel!) THEN vel!=MaxVel!
+
+    GOSUB DrawAim
+END IF
+RETURN
+
 HandleKeys:
+IF (cowState$="Flying") THEN RETURN
 k$=UCASE$(INKEY$)
 IF k$="" THEN RETURN
 IF k$=CHR$(29) AND angle!<MaxAng! THEN 'Right
@@ -343,21 +371,21 @@ ELSEIF k$=CHR$(28) AND angle!>MinAng! THEN 'Left
   GOSUB EraseAim
   angle!=angle!-angChange!
   GOSUB DrawAim
-ELSEIF k$=CHR$(30) AND Vel!<MaxVel! THEN 'Up
+ELSEIF k$=CHR$(30) AND vel!<MaxVel! THEN 'Up
   GOSUB EraseAim
-  Vel!=Vel!+velChange!
+  vel!=vel!+velChange!
   GOSUB DrawAim
-ELSEIF k$=CHR$(31) AND Vel!>MinVel! THEN 'Down
+ELSEIF k$=CHR$(31) AND vel!>MinVel! THEN 'Down
   GOSUB EraseAim
-  Vel!=Vel!-velChange!
+  vel!=vel!-velChange!
   GOSUB DrawAim
-ELSEIF k$="W" AND Vel!<MaxVel! THEN 'Up
+ELSEIF k$="W" AND vel!<MaxVel! THEN 'Up
   GOSUB EraseAim
-  Vel!=Vel!+fineVelChange!
+  vel!=vel!+fineVelChange!
   GOSUB DrawAim
-ELSEIF k$="S" AND Vel!>MinVel! THEN 'Down
+ELSEIF k$="S" AND vel!>MinVel! THEN 'Down
   GOSUB EraseAim
-  Vel!=Vel!-fineVelChange!
+  vel!=vel!-fineVelChange!
   GOSUB DrawAim
 ELSEIF k$=" " THEN
     GOSUB TossCow
@@ -373,8 +401,8 @@ cowX!=CowW/2:cowY!=(SH%-CowH)/2
 cowState$="Flying"
 cowsLeft%=cowsLeft%-1
 GOSUB DrawCowsLeft
-cowXV!=Vel!*COS(angle!)*speed!
-cowYV!=Vel!*SIN(angle!)*speed!
+cowXV!=vel!*COS(angle!)*speed!
+cowYV!=vel!*SIN(angle!)*speed!
 GOSUB DrawFlyingCow 'Prime the pump so initial cow isn't left behind
 RETURN
 
@@ -486,15 +514,15 @@ GOSUB CheckLevelDone
 RETURN
 
 EraseAim:
-CALL DrawAim(angle!,Vel!,0)
+CALL DrawAim(angle!,vel!,0)
 RETURN
 
 DrawAim:
-CALL DrawAim(angle!,Vel!,1)
+CALL DrawAim(angle!,vel!,1)
 RETURN
 
 DrawLevel:
-CALL DrawAim(angle!,Vel!,1)
+CALL DrawAim(angle!,vel!,1)
 RETURN
 
 CheckLevelDone:
@@ -541,11 +569,11 @@ DATA 0.65, 0.25, 3
 DATA 0.75, 0.75, 3
 'Level 8
 DATA 5
-DATA 0.3,0.3,1
-DATA 0.7,0.3,1
+DATA 0.25,0.25,2
+DATA 0.75,0.25,2
 DATA 0.5,0.5,2
-DATA 0.3,0.7,1
-DATA 0.7,0.7,1
+DATA 0.25,0.75,2
+DATA 0.75,0.75,2
 'Level 9
 DATA 6
 DATA 0.25, 0.4, 3
@@ -826,11 +854,11 @@ SUB DrawTorn(x%,y%,rad%) STATIC
     NEXT r%
 END SUB
 
-SUB DrawAim(ang!,Vel!,c%) STATIC
+SUB DrawAim(ang!,vel!,c%) STATIC
     SHARED TxtSW%,TxtSH%
     
     x%=0:y%=SYSTEM(6)/2
-    stR=16:enR=16+Vel!*8
+    stR=16:enR=16+vel!*8
     enX=x%+COS(ang!)*enR
     enY=y%+SIN(ang!)*enR
     LINE (x%+COS(ang!)*stR, y%+SIN(ang!)*stR)-(enX,enY),c%
@@ -839,7 +867,7 @@ SUB DrawAim(ang!,Vel!,c%) STATIC
     PRINT "Ang ";
     PRINT USING "###.#";-ang!*180/3.1416;
     PRINT ", Vel ";
-    PRINT USING "##.##";Vel!;
+    PRINT USING "##.##";vel!;
 END SUB
 
 SUB ReadImageData(img%(1),w%,h%,invert%) STATIC
