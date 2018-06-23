@@ -12,7 +12,7 @@ TxtSH%=18:TxtSW%=70
 TxtSH2%=TxtSH%/2:TxtSW2%=TxtSW%/2
 
 speed!=4!
-tornGDensity!=2!*speed!*speed!
+tornGDensity!=1.4*speed!*speed!
 TornCollision!=.5
 MinAng!=-3.1416/2
 MaxAng!=3.1416/2
@@ -22,7 +22,7 @@ angChange!=3.1416/180*2
 fineAngChange!=3.1416/180/10
 velChange!=.25
 CowH=16:CowW=32
-CowH2=CowH/2:cowW2=CowW/2
+cowH2=CowH/2:cowW2=CowW/2
 BarnH=64:BarnW=64
 BarnX=SW-BarnW:BarnY=(SH-BarnH)/2
 CowMinX=-SW/4:CowMaxX=SW+SW/4
@@ -42,10 +42,15 @@ WEND
 END
 
 InitData:
+CLS
+PRINT "Loading images..."
 RESTORE BarnData
 CALL ReadImageData(imgBarn%(),BarnW,BarnH,1)
 RESTORE CowData
 CALL ReadImageData(imgCow%(),CowW,CowH,0)
+PRINT "Precalculating gravitation..."
+GOSUB InitTornTables
+PRINT "Done."
 RETURN
 
 Title:
@@ -68,12 +73,13 @@ FOR cy!=0 TO th! STEP 1.6 '.8
     y!=ty1!+cy!+SIN(tAng!)*rad!*.1
     LINE (px!,py!)-(x!,y!)
     px!=x!:py!=y!
-    tAng!=tAng!+.4
+    tAng!=tAng!+.6
 NEXT cy!
 
 ' Initialize the tornado cows
 DIM tcowRad!(20),tcowAng!(20),tcowCY!(20)
-ntCows%=10
+ntCows%=3
+RANDOMIZE 1
 FOR c%=1 TO ntCows%
     y!=RND*SH2% 
     tcowCY!(c%) = y!+ty1!
@@ -138,7 +144,7 @@ cowState$="Waiting" ' Flying, Dead, Barn
 CLS
 CALL UpdateScore(0)
 LOCATE 1,1:PRINT "Level ";lvl%
-LOCATE TxtSH%,TxtSW%-16:PRINT "[S] Sound On/Off";
+LOCATE TxtSH%,TxtSW%-24:PRINT "[S] Sound On/Off";
 GOSUB LoadTornados ' RandomizeTornados
 GOSUB DrawCowsLeft
 CALL DrawAim(angle!,Vel!,1)
@@ -163,6 +169,80 @@ FOR t%=1 TO numTorns%
 NEXT t%
 RETURN
 
+'=tornRad(t%)*tornRad(t%)*tornGDensity!
+
+
+InitTornTables:
+DEF FNTRad(s%)=(s%+2)*(SH%/48)
+'TTSize=64    ' actually only indices 1-63 are filled, with 32 at center
+TTSize=56
+TTSize2=TTSize/2
+TTStep=8 '256/TTSize
+TTRSize2=TTSize2*TTStep
+DIM tornAX!(2,TTSize,TTSize), tornAY!(3,TTSize,TTSize)
+FOR s%=0 TO 2  ' Each tornado size
+    r%=FNTRad(s%+1)
+    g!=r%*r%*tornGDensity!
+    FOR dy%=0 TO TTSize2-1
+    'PRINT "dy=";dy%
+    'PRINT "dx=";
+    FOR dx%=dy% TO TTSize2-1
+        'PRINT dx%;",";
+        rdx&=dx%*TTStep:rdy&=dy%*TTStep
+        distSq&=rdx&*rdx&+rdy&*rdy&
+        dist!=SQR(distSq&)
+        ax!=rdx&/(dist!*distSq&) * g!
+        ay!=rdy&/(dist!*distSq&) * g!
+
+        ' Quadrant I
+        x%=TTSize2+dx%
+        y%=TTSize2+dy%
+        tornAX!(s%,x%,y%)=-ax!
+        tornAY!(s%,x%,y%)=-ay!
+        tornAX!(s%,y%,x%)=-ay!
+        tornAY!(s%,y%,x%)=-ax!
+
+        ' Quadrant II
+        x%=TTSize2-dx%
+        y%=TTSize2+dy%
+        tornAX!(s%,x%,y%)=ax!
+        tornAY!(s%,x%,y%)=-ay!
+        tornAX!(s%,y%,x%)=-ay!
+        tornAY!(s%,y%,x%)=ax!
+
+        ' Quadrant III
+        x%=TTSize2-dx%
+        y%=TTSize2-dy%
+        tornAX!(s%,x%,y%)=ax!
+        tornAY!(s%,x%,y%)=ay!
+        tornAX!(s%,y%,x%)=ay!
+        tornAY!(s%,y%,x%)=ax!
+
+        ' Quadrant IV
+        x%=TTSize2+dx%
+        y%=TTSize2-dy%
+        tornAX!(s%,x%,y%)=-ax!
+        tornAY!(s%,x%,y%)=ay!
+        tornAX!(s%,y%,x%)=ay!
+        tornAY!(s%,y%,x%)=-ax!
+NEXT dx%,dy%,s%
+RETURN
+' The following is for seeing a sampling of the vector values in a grid
+' remove the above RETURN statement to see
+GOSUB WaitKey
+CLS
+FOR y%=4 TO TTSize-1 STEP 9
+    FOR x%=4 TO TTSize-1 STEP 9
+        PRINT USING "#.##";tornAX!(0,x%,y%);
+        PRINT ",";
+        PRINT USING "#.##";tornAY!(0,x%,y%);
+        PRINT "|";
+    NEXT x%
+    PRINT
+NEXT y%
+GOSUB WaitKey
+RETURN
+
 LoadTornados:
 RESTORE LevelData
 ' Skip to current level's data
@@ -176,10 +256,14 @@ FOR t%=1 TO numTorns%
     READ x!,y!,s%
     tornX(t%)=INT(x!*SW)
     tornY(t%)=INT(y!*SH)
+    tornS%(t%)=s%-1
     tornRad(t%)=(s%+2)*(SH%/48)
+    tornCollRad%(t%)=tornRad(t%)+cowH2
     tornG!(t%)=tornRad(t%)*tornRad(t%)*tornGDensity!
     CALL DrawTorn(tornX(t%), tornY(t%), tornRad(t%))
 NEXT t%
+'GOSUB PrecalcForces
+RETURN
 
 PrecalcForces:
 DIM lax!(128, 86),lay!(128,86)
@@ -237,7 +321,7 @@ RETURN
 
 MoveLevel:
 GOSUB HandleKeys
-GOSUB MoveCows
+GOSUB MoveCow
 RETURN
 
 HandleKeys:
@@ -295,27 +379,30 @@ GOSUB DrawFlyingCow 'Prime the pump so initial cow isn't left behind
 RETURN
 
 DrawFlyingCow:
-PUT (cowX!-cowW2,cowY!-CowH2),imgCow%,XOR
+PUT (cowX!-cowW2,cowY!-cowH2),imgCow%,XOR
 RETURN
 
-MoveCowsOld:
+CalcCowMove:
+'Important to use integer math as much as possible
+'since the Mac 128k/512k has no floating point unit; fp is done in software!
 IF (cowState$ <> "Flying") THEN RETURN
 FOR t%=1 TO numTorns%
-    dx!=tornX(t%)-cowX!
-    dy!=tornY(t%)-cowY!
-    distSq!=dx!*dx! + dy!*dy!
-    dist!=SQR(distSq!)
-    IF dist! < CowH+(tornRad(t%)*TornCollision!) THEN
+    dx%=tornX(t%)-INT(cowX!)
+    dy%=tornY(t%)-INT(cowY!)
+    distSq&=dx%*dx% + dy%*dy%
+    dist%=SQR(distSq&)
+    IF dist% < CowH+(tornColRad(t%)) THEN
         GOSUB TornadoGotCow
         RETURN
     END IF
-    ax!=dx!/(dist!*distSq!) * tornG!(t%)
-    ay!=dy!/(dist!*distSq!) * tornG!(t%)
+    ax!=dx!/(dist%*distSq&) * tornG!(t%)
+    ay!=dy!/(dist%*distSq&) * tornG!(t%)
     cowXV!=cowXV!+ax!
     cowYV!=cowYV!+ay!
 NEXT t%
+RETURN
 
-MoveCows:
+CalcCowMoveLevelTable:
 IF (cowState$ <> "Flying") THEN RETURN
 FOR t%=1 TO numTorns%
     dx%=tornX(t%)-INT(cowX!)
@@ -329,14 +416,40 @@ FOR t%=1 TO numTorns%
 NEXT t%
 cowXV! = cowXV! + lax!(INT(cowX!)/4)
 cowYV! = cowYV! + lay!(INT(cowY!)/4)
+RETURN
+
+MoveCow:
+IF (cowState$ <> "Flying") THEN RETURN
+GOSUB CalcCowMoveTornTable
+IF (cowState$ <> "Flying") THEN RETURN
 'GOSUB DrawFlyingCow
-PUT (cowX!-cowW2,cowY!-CowH2),imgCow%,XOR
+cowix%=INT(cowX!):cowiy%=INT(cowY!)
+PUT (cowix%-cowW2,cowiy%-cowH2),imgCow%,XOR
 cowX!=cowX!+cowXV!
 cowY!=cowY!+cowYV!
-PUT (cowX!-cowW2,cowY!-CowH2),imgCow%,XOR
+cowix%=INT(cowX!):cowiy%=INT(cowY!)
 'GOSUB DrawFlyingCow
-IF cowX! > BarnX-cowW2 AND cowY! > BarnY-CowH2 AND cowY! < BarnY+BarnH+CowH2 AND cowX! < BarnX+BarnW+cowW2 THEN GOSUB CowMadeIt
-IF cowX! > CowMaxX OR cowX! < CowMinX OR cowY! > CowMaxY OR cowY < CowMinY THEN GOSUB CowWentByeBye
+PUT (cowix%-cowW2,cowiy%-cowH2),imgCow%,XOR
+'PSET (cowix%,cowiy%)
+IF cowix% > BarnX-cowW2 AND cowix% < BarnX+BarnW+cowW2 AND cowiy% > BarnY-cowH2 AND cowiy% < BarnY+BarnH+cowH2 THEN GOSUB CowMadeIt
+IF cowix% > CowMaxX OR cowix% < CowMinX OR cowiy% > CowMaxY OR cowiy% < CowMinY THEN GOSUB CowWentByeBye
+RETURN
+
+CalcCowMoveTornTable:
+FOR t%=1 TO numTorns%
+    dx%=INT(cowX!)-tornX(t%)
+    dy%=INT(cowY!)-tornY(t%)
+    IF (ABS(dx%)+ABS(dy%)) < tornCollRad%(t%) THEN    ' Inset diamond collision shape
+        GOSUB TornadoGotCow
+        RETURN
+    END IF
+    IF (ABS(dx%) < TTRSize2 AND ABS(dy%) < TTRSize2) THEN
+        tdx%=TTSize2 + dx%/TTStep
+        tdy%=TTSize2 + dy%/TTStep
+        cowXV!=cowXV!+tornAX!(tornS%(t%), tdx%, tdy%)
+        cowYV!=cowYV!+tornAY!(tornS%(t%), tdx%, tdy%)
+    END IF
+NEXT t%
 RETURN
 
 TornadoGotCow:
@@ -434,12 +547,13 @@ DATA 0.5,0.5,2
 DATA 0.3,0.7,1
 DATA 0.7,0.7,1
 'Level 9
-DATA 5
+DATA 6
 DATA 0.25, 0.4, 3
 DATA 0.35, 0.75, 3
 DATA 0.65, 0.25, 3
 DATA 0.9, 0.05, 3
-DATA 0.88,0.5,1
+DATA 0.9,0.65,1
+DATA 0.85,0.5,1
 'Level 10
 'DATA 1
 'DATA 0.23,0.5,1
@@ -448,8 +562,10 @@ DATA 0.28,0.6,2
 DATA 0.15,0.7,2
 DATA 0.5,0.5,3
 DATA 0.4,0.6,3
-DATA 0.67,0.62,3
-DATA 0.95,0.7,2
+DATA 0.64,0.66,2
+'DATA 0.67,0.62,2
+DATA 0.90,0.65,2
+'data 0.95,0.7,2
 
 BarnData:
 DATA &Hffff,&Hffff,&Hf3ff,&Hffff,&Hffff,&Hffff,&Hc1ff,&Hffff
@@ -506,6 +622,7 @@ FOR c%=1 TO nCows%
     ecowy%(c%)=INT(RND*(SH/4))+(SH2)
     PUT (ecowx%(c%)-dance%,ecowy%(c%)),imgCow%,XOR
 NEXT c%
+nCows%=3 ' Too many dancing cows is too slow
 ' Fence
 LINE(0,SH-64)-(SW,SH-64)
 LINE (0,SH-56)-(SW,SH-56)
@@ -680,10 +797,10 @@ SUB Sleep(s#) STATIC
 END SUB
 
 SUB DrawTCow(cy!, rad!, ang!) STATIC
-    SHARED imgCow%(),SW2%,cowW2,CowH2
+    SHARED imgCow%(),SW2%,cowW2,cowH2
     x!=SW2%+COS(ang!)*rad!
     y!=cy!+SIN(ang!)*rad!*.1
-    PUT (x!-cowW2,y!-CowH2),imgCow%,XOR
+    PUT (x!-cowW2,y!-cowH2),imgCow%,XOR
 END SUB
 
 SUB UpdateScore(points%) STATIC
