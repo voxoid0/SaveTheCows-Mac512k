@@ -65,8 +65,8 @@ DATA -93,-91,-87,-83,-79,-74,-69,-63,-57,-51,-44,-37,-30,-23,-15,-8
     NEXT I
     '    p1,p2,p3,p4,p6,p8 correspond to 36.4 ... 4.55 time units
     DATA 0,0,0,0,0,0,0,0,0,0, 36.4,18.2,12.133333,9.1,6.0666667,4.55, 2.275,1.1375,0,0,0
-
-    OPEN "Music1Data.txt" FOR OUTPUT AS 1
+    OPEN "joel.becker:MusicData.txt" FOR OPEN AS 1
+    'OPEN "joel.becker:Save the Cows" FOR APPEND AS 1
 RePlay:
 SOUND RESUME
 RESTORE Song
@@ -112,11 +112,12 @@ Loop:
             SOUND F#(Fi),t#,,v
         END IF
         
-        PRINT #1, "DATA ";di%;",";
+        PRINT #1, "DATA ";di%;
         FOR d%=0 TO di%-1
-            PRINT #1, USING "#.##";dataf#(d%);
+            PRINT #1,",";
+            PRINT #1, USING "####.##";dataf#(d%);
             PRINT #1, ",";
-            PRINT #1,datat#(d%);",";
+            PRINT #1,datat#(d%);
         NEXT d%
         PRINT #1,
         

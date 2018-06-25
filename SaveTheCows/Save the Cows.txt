@@ -33,7 +33,6 @@ DIM imgCow%(34) ' 32 x 16 / 16 + 2
 soundOn%=1
 
 GOSUB InitData
-GOTO BeatGame
 WHILE (1)
     GOSUB Title
     GOSUB Instructions
@@ -48,7 +47,10 @@ RESTORE BarnData
 CALL ReadImageData(imgBarn%(),BarnW,BarnH,1)
 RESTORE CowData
 CALL ReadImageData(imgCow%(),CowW,CowH,0)
+'GOTO BeatGame
 PRINT "Precalculating gravitation..."
+PRINT "    This will take about 3 minutes! But it's totally worth it..."
+'PRINT "    (Please ignore the math error messages below...)"
 GOSUB InitTornTables
 PRINT "Done."
 RETURN
@@ -92,7 +94,7 @@ NEXT c%
 k$=INKEY$
 tcowAngSpeed!=3.1416/18!*speed!
 WHILE (MOUSE(0)=-1):WEND
-WHILE(INKEY$="" AND MOUSE(0)=0)
+WHILE(INKEY$="") AND MOUSE(0)=0)
     FOR c%=1 TO ntCows%
         CALL DrawTCow(tcowCY!(c%),tcowRad!(c%),tcowAng!(c%))
         tcowAng!(c%)=tcowAng!(c%)+tcowAngSpeed!
@@ -104,8 +106,8 @@ RETURN
 
 Game:
 CLS
-lvl%=8
-lost%=0
+lvl%=1
+lost%=-0
 score%=0
 WHILE (lvl%<=10 AND lost%=0)
   GOSUB DoLevel
@@ -188,6 +190,7 @@ FOR s%=0 TO 2  ' Each tornado size
     'PRINT "dy=";dy%
     'PRINT "dx=";
     FOR dx%=dy% TO TTSize2-1
+        IF dx%=0 AND dy%=0 THEN GOTO SkipTornTabSample
         'PRINT dx%;",";
         rdx&=dx%*TTStep:rdy&=dy%*TTStep
         distSq&=rdx&*rdx&+rdy&*rdy&
@@ -226,6 +229,7 @@ FOR s%=0 TO 2  ' Each tornado size
         tornAY!(s%,x%,y%)=ay!
         tornAX!(s%,y%,x%)=ay!
         tornAY!(s%,y%,x%)=-ax!
+SkipTornTabSample:
 NEXT dx%,dy%,s%
 RETURN
 ' The following is for seeing a sampling of the vector values in a grid
@@ -301,20 +305,18 @@ PRINT "You need to get at least one of your cows to safety in each level, otherw
 PRINT "what are you gunna use FOR burgers 'n' steaks?"
 PRINT
 PRINT "CONTROLS:"
-PRINT "[Left]/[Right] arrow keys: Set Angle"
-PRINT "[Up]/[Down] arrow keys: Set Velocity
-PRINT "[Space] Throw the next cow
+PRINT "Move the mouse to control angle and velocity. Click to throw a cow."
 PRINT
 PRINT "TIP: Use the suction power of the tornados to guide the cows to safety."
 PRINT "Also, don't try this at home."
 PRINT
-PRINT "(Press any key)": GOSUB WaitKey
+GOSUB WaitKey
 RETURN
 
 WaitKey:
 i$=INKEY$
 WHILE INKEY$<>"" OR MOUSE(0)<>0:WEND
-WHILE INKEY$="" AND MOUSE(0)=0:WEND
+WHILE INKEY$="":WEND AND MOUSE(0)=0:WEND
 WHILE MOUSE(0)=-1:WEND
 RETURN
 
@@ -330,23 +332,33 @@ RETURN
 
 HandleMouse:
 IF (cowState$="Flying") THEN RETURN
-IF MOUSE(0)=-1 THEN 
-    GOSUB TossCow
+IF MOUSE(0)=-1 THEN
+    GOSUB TossCow'
 ELSE
-    GOSUB EraseAim
+
     dx=MOUSE(1)
     dy=MOUSE(2)-SH2
-    IF dx=0 THEN
-        IF dy>0 THEN angle!=3.1416/2 ELSE angle!=-3.1416/2
-    ELSE
-        angle!=ATN(dy/dx)
-    END IF
-    angle!=INT(angle!*90/3.1416)*3.1416/90
-    
-    vel!=INT(SQR(dx*dx+dy*dy)/(SH/3)*MaxVel!*4)/4!
-    IF (vel! < MinVel!) THEN vel!=MinVel!
-    IF (vel! > MaxVel!) THEN vel!=MaxVel!
 
+    'a!=dy/SH2*1.5708*1.5
+    'IF a!>1.5708 THEN a!=1.5708
+    'IF a!<-1.5708 THEN a!=-1.5708
+    'v!=dx/SW2*MaxVel!
+    'IF (v! < MinVel!) THEN v!=MinVel!
+    'IF (v! > MaxVel!) THEN v!=MaxVel!
+
+    IF dx=0 THEN
+        IF dy>0 THEN a!=3.1416/2 ELSE a!=-3.1416/2
+    ELSE
+        a!=ATN(dy/dx)
+    END IF
+    a!=INT(a!*90/3.1416)*3.1416/90
+
+    v!=INT(SQR(dx*dx+dy*dy)/(SH*.4)*MaxVel!*4)/4!
+    IF (v! < MinVel!) THEN v!=MinVel!
+    IF (v! > MaxVel!) THEN v!=MaxVel!
+
+    GOSUB EraseAim
+    angle!=a!:vel!=v!
     GOSUB DrawAim
 END IF
 RETURN
@@ -419,12 +431,12 @@ FOR t%=1 TO numTorns%
     dy%=tornY(t%)-INT(cowY!)
     distSq&=dx%*dx% + dy%*dy%
     dist%=SQR(distSq&)
-    IF dist% < CowH+(tornColRad(t%)) THEN
+    IF dist% < tornCollRad%(t%) THEN
         GOSUB TornadoGotCow
         RETURN
     END IF
-    ax!=dx!/(dist%*distSq&) * tornG!(t%)
-    ay!=dy!/(dist%*distSq&) * tornG!(t%)
+    ax!=dx%/(dist%*distSq&) * tornG!(t%)
+    ay!=dy%/(dist%*distSq&) * tornG!(t%)
     cowXV!=cowXV!+ax!
     cowYV!=cowYV!+ay!
 NEXT t%
@@ -448,7 +460,7 @@ RETURN
 
 MoveCow:
 IF (cowState$ <> "Flying") THEN RETURN
-GOSUB CalcCowMoveTornTable
+GOSUB CalcCowMove 'TornTable
 IF (cowState$ <> "Flying") THEN RETURN
 'GOSUB DrawFlyingCow
 cowix%=INT(cowX!):cowiy%=INT(cowY!)
@@ -522,7 +534,7 @@ CALL DrawAim(angle!,vel!,1)
 RETURN
 
 DrawLevel:
-CALL DrawAim(angle!,vel!,1)
+'CALL DrawAim(angle!,vel!,1)
 RETURN
 
 CheckLevelDone:
@@ -639,18 +651,19 @@ DATA &H05f1,&Hff70,&H05e7,&Hffa0,&H1def,&He980,&H0cc0,&H0000
 ' *************************************
 BeatGame: 
 CLS
+LOCATE 3,27:PRINT "T H E   E N D"
 LINE (0,SH2)-(SW,SH2)
 PUT (SW2-BarnW/2,SH2-BarnH/2),imgBarn%,PSET
 DIM ecowx%(15),ecowy%(15)
 nCows%=15
 dance%=4
-RANDOMIZE 2
+RANDOMIZE 26
 FOR c%=1 TO nCows%
     ecowx%(c%)=INT(RND*(SW-CowW))
     ecowy%(c%)=INT(RND*(SH/4))+(SH2)
     PUT (ecowx%(c%)-dance%,ecowy%(c%)),imgCow%,XOR
 NEXT c%
-nCows%=3 ' Too many dancing cows is too slow
+'nCows%=3 ' Too many dancing cows is too slow
 ' Fence
 LINE(0,SH-64)-(SW,SH-64)
 LINE (0,SH-56)-(SW,SH-56)
@@ -670,11 +683,11 @@ DIM r%(4)
     RESTORE BeatGameInitMusic
     '    F#() contains frequencies for notes in the diatonic scale
     '    octave 0, note A = F#(12) = 55 Hz
-    DIM f#(88)
-    Log2of27.5# = LOG(27.5#)/LOG(2#)
-    FOR x%=1 TO 88
-        f#(x%) = 2^(Log2of27.5# + x%/12#)
-    NEXT x%
+    'DIM f#(88)
+    'Log2of27.5# = LOG(27.5#)/LOG(2#)
+    'FOR x%=1 TO 88
+    '    f#(x%) = 2^(Log2of27.5# + x%/12#)
+    'NEXT x%
 
     '    Build fundamental wave form
     '    Controls the quality of the sound
@@ -710,6 +723,8 @@ DATA -93,-91,-87,-83,-79,-74,-69,-63,-57,-51,-44,-37,-30,-23,-15,-8
     WAVE 1,Timbre
     WAVE 2,Timbre
     WAVE 3,Timbre
+    
+    GOTO RePlay
 
     '    Array CF maps MML commands to frequency indices
     c$ = "cdefgabp#-12346890<>l"
@@ -736,14 +751,33 @@ FOR v=0 TO 3
   READ VO(v)
   VO(v)=12*VO(v) + 3
 NEXT v
+
+RESTORE SongDataRaw
+cc%=0
 BeatGameMusicLoop:
     IF (INKEY$=CHR$(27)) THEN END
-    FOR c%=1 TO nCows%
+    c%=(cc%/2) MOD nCows% + 1
+    cc%=cc%+1
         PUT (ecowx%(c%)-dance%,ecowy%(c%)),imgCow%,XOR
         PUT (ecowx%(c%)+dance%,ecowy%(c%)),imgCow%,XOR
-    NEXT c%
     dance%=-dance%
-    
+
+    SOUND WAIT
+    FOR v=0 TO 3
+        t#=VT#(v)
+        Fi=-1
+        READ cnt%
+        IF cnt%=0 THEN RePlay
+        FOR i=1 TO cnt%
+            READ f#,t#
+            SOUND f#,t#,,v
+        NEXT i
+    NEXT v
+    SOUND RESUME
+    GOTO BeatGameMusicLoop
+
+
+Old:
     SOUND WAIT
     FOR v=0 TO 3
         t#=VT#(v)
@@ -819,6 +853,140 @@ DATA dfd<c>c<c#>c#d,l2p,l2p,l2p
 DATA x
 ' *************************************
 
+SongDataRaw:
+DATA  2 ,  98.00, 9.1 , 123.47, 9.1 
+DATA  8 ,   0.00, 2.275 , 392.00, 2.275 , 493.88, 2.275 , 523.25, 2.275 , 554.37, 2.275 , 587.33, 2.275 , 659.26, 2.275 , 783.99, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  2 , 130.81, 9.1 , 138.59, 9.1 
+DATA  8 , 783.99, 2.275 , 587.33, 2.275 , 659.26, 2.275 , 783.99, 2.275 , 659.26, 2.275 , 466.16, 2.275 , 440.00, 2.275 , 392.00, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  2 , 146.83, 9.1 , 164.81, 9.1 
+DATA  8 , 493.88, 2.275 , 523.25, 2.275 , 554.37, 2.275 , 587.33, 2.275 , 493.88, 2.275 , 392.00, 2.275 , 329.63, 2.275 , 293.66, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  6 , 110.00, 4.55 ,   0.00, 2.275 , 146.83, 2.275 ,   0.00, 2.275 ,  73.42, 4.55 ,   0.00, 2.275 
+DATA  7 , 329.63, 2.275 , 392.00, 2.275 , 329.63, 2.275 , 466.16, 2.275 ,   0.00, 2.275 , 440.00, 4.55 ,   0.00, 2.275 
+DATA  7 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 277.18, 2.275 ,   0.00, 2.275 , 261.63, 4.55 ,   0.00, 2.275 
+DATA  1 ,   0.00, 18.2 
+
+DATA  2 ,  98.00, 9.1 , 123.47, 9.1 
+DATA  8 ,   0.00, 2.275 , 392.00, 2.275 , 493.88, 2.275 , 523.25, 2.275 , 554.37, 2.275 , 587.33, 2.275 , 659.26, 2.275 , 783.99, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  2 , 130.81, 9.1 , 138.59, 9.1 
+DATA  8 , 783.99, 2.275 , 587.33, 2.275 , 659.26, 2.275 , 783.99, 2.275 , 659.26, 2.275 , 466.16, 2.275 , 440.00, 2.275 , 392.00, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  2 , 146.83, 9.1 , 164.81, 9.1 
+DATA  8 , 493.88, 2.275 , 523.25, 2.275 , 554.37, 2.275 , 587.33, 2.275 , 493.88, 2.275 , 392.00, 2.275 , 329.63, 2.275 , 293.66, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  5 , 110.00, 2.275 , 146.83, 2.275 ,   0.00, 2.275 ,  98.00, 9.1 ,   0.00, 2.275 
+DATA  5 , 466.16, 2.275 , 440.00, 2.275 ,   0.00, 2.275 , 392.00, 9.1 ,   0.00, 2.275 
+DATA  5 , 277.18, 2.275 , 261.63, 2.275 ,   0.00, 2.275 , 246.94, 9.1 ,   0.00, 2.275 
+DATA  1 ,   0.00, 18.2 
+
+DATA  8 ,  49.00, 2.275 ,   0.00, 2.275 ,  98.00, 2.275 ,   0.00, 2.275 ,  61.74, 2.275 ,   0.00, 2.275 , 123.47, 2.275 ,   0.00, 2.275 
+DATA  8 ,   0.00, 2.275 , 392.00, 2.275 , 493.88, 2.275 , 523.25, 2.275 , 554.37, 2.275 , 587.33, 2.275 , 659.26, 2.275 , 783.99, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  8 ,  65.41, 2.275 ,   0.00, 2.275 , 130.81, 2.275 ,   0.00, 2.275 ,  69.30, 2.275 ,   0.00, 2.275 , 138.59, 2.275 ,   0.00, 2.275 
+DATA  8 , 783.99, 2.275 , 587.33, 2.275 , 659.26, 2.275 , 783.99, 2.275 , 659.26, 2.275 , 466.16, 2.275 , 440.00, 2.275 , 392.00, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  8 ,  73.42, 2.275 ,   0.00, 2.275 , 146.83, 2.275 ,   0.00, 2.275 ,  82.41, 2.275 ,   0.00, 2.275 , 164.81, 2.275 ,   0.00, 2.275 
+DATA  8 , 493.88, 2.275 , 523.25, 2.275 , 554.37, 2.275 , 587.33, 2.275 , 493.88, 2.275 , 392.00, 2.275 , 329.63, 2.275 , 293.66, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  7 ,  55.00, 2.275 , 110.00, 2.275 ,   0.00, 2.275 , 146.83, 2.275 ,   0.00, 2.275 ,  73.42, 4.55 ,   0.00, 2.275 
+DATA  7 , 329.63, 2.275 , 392.00, 2.275 , 329.63, 2.275 , 466.16, 2.275 ,   0.00, 2.275 , 440.00, 4.55 ,   0.00, 2.275 
+DATA  7 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 277.18, 2.275 ,   0.00, 2.275 , 261.63, 4.55 ,   0.00, 2.275 
+DATA  1 ,   0.00, 18.2 
+
+DATA  8 ,  49.00, 2.275 ,   0.00, 2.275 ,  98.00, 2.275 ,   0.00, 2.275 ,  61.74, 2.275 ,   0.00, 2.275 , 123.47, 2.275 ,   0.00, 2.275 
+DATA  8 ,   0.00, 2.275 , 392.00, 2.275 , 493.88, 2.275 , 523.25, 2.275 , 554.37, 2.275 , 587.33, 2.275 , 659.26, 2.275 , 783.99, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  8 ,  65.41, 2.275 ,   0.00, 2.275 , 130.81, 2.275 ,   0.00, 2.275 ,  69.30, 2.275 ,   0.00, 2.275 , 138.59, 2.275 ,   0.00, 2.275 
+DATA  8 , 783.99, 2.275 , 587.33, 2.275 , 659.26, 2.275 , 783.99, 2.275 , 659.26, 2.275 , 466.16, 2.275 , 440.00, 2.275 , 392.00, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  8 ,  73.42, 2.275 ,   0.00, 2.275 , 146.83, 2.275 ,   0.00, 2.275 ,  82.41, 2.275 ,   0.00, 2.275 , 164.81, 2.275 ,   0.00, 2.275 
+DATA  8 , 493.88, 2.275 , 523.25, 2.275 , 554.37, 2.275 , 587.33, 2.275 , 493.88, 2.275 , 392.00, 2.275 , 329.63, 2.275 , 293.66, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  5 , 110.00, 2.275 ,  73.42, 2.275 ,   0.00, 2.275 ,  98.00, 9.1 ,   0.00, 2.275 
+DATA  5 , 466.16, 2.275 , 440.00, 2.275 ,   0.00, 2.275 , 392.00, 9.1 ,   0.00, 2.275 
+DATA  7 , 277.18, 2.275 , 261.63, 2.275 ,   0.00, 2.275 , 246.94, 4.55 , 196.00, 2.275 , 164.81, 2.275 , 146.83, 2.275 
+DATA  1 ,   0.00, 18.2 
+
+DATA  8 ,  65.41, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,  65.41, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  7 , 261.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 261.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 164.81, 2.275 , 196.00, 2.275 ,   0.00, 2.275 , 196.00, 2.275 ,   0.00, 2.275 , 196.00, 2.275 , 164.81, 2.275 , 146.83, 2.275 
+DATA  8 , 329.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 329.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+
+DATA  8 ,  69.30, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,  69.30, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 233.08, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 233.08, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 164.81, 2.275 , 196.00, 2.275 ,   0.00, 2.275 , 196.00, 2.275 ,   0.00, 2.275 , 196.00, 2.275 , 164.81, 2.275 , 146.83, 2.275 
+DATA  8 , 329.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 329.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+
+DATA  7 ,  73.42, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,  73.42, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 246.94, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 246.94, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 246.94, 2.275 , 293.66, 2.275 ,   0.00, 2.275 , 293.66, 2.275 ,   0.00, 2.275 , 311.13, 2.275 , 329.63, 2.275 , 349.23, 2.275 
+DATA  8 , 392.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 392.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+
+DATA  5 ,  49.00, 2.275 ,  98.00, 2.275 ,  87.31, 4.55 ,  82.41, 4.55 ,  73.42, 4.55 
+DATA  6 , 554.37, 2.275 , 587.33, 2.275 , 587.33, 2.275 ,   0.00, 2.275 , 659.26, 4.55 , 698.46, 4.55 
+DATA  8 , 349.23, 2.275 , 329.63, 2.275 , 311.13, 2.275 , 293.66, 2.275 , 233.08, 2.275 , 220.00, 2.275 , 207.65, 2.275 , 196.00, 2.275 
+DATA  4 , 392.00, 4.55 , 392.00, 4.55 , 392.00, 4.55 , 392.00, 4.55 
+
+DATA  8 ,  65.41, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,  65.41, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  7 , 523.25, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 523.25, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 196.00, 2.275 , 164.81, 2.275 ,   0.00, 2.275 , 196.00, 2.275 ,   0.00, 2.275 , 146.83, 2.275 , 164.81, 2.275 , 146.83, 2.275 
+DATA  8 , 329.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 329.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+
+DATA  8 ,  69.30, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,  69.30, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 466.16, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 466.16, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 196.00, 2.275 , 164.81, 2.275 ,   0.00, 2.275 , 196.00, 2.275 ,   0.00, 2.275 , 164.81, 2.275 , 146.83, 2.275 , 164.81, 2.275 
+DATA  8 , 329.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 329.63, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+
+DATA  7 ,  73.42, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,  73.42, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 493.88, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 493.88, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+DATA  8 , 246.94, 2.275 , 293.66, 2.275 ,   0.00, 2.275 , 293.66, 2.275 ,   0.00, 2.275 , 293.66, 2.275 ,   0.00, 2.275 , 293.66, 2.275 
+DATA  8 , 392.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 , 392.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 ,   0.00, 2.275 
+
+DATA  9 ,  73.42, 2.275 ,  73.42, 2.275 ,   0.00, 2.275 ,  73.42, 2.275 ,   0.00, 2.275 ,  73.42, 2.275 ,   0.00, 2.275 ,  73.42, 2.275 , 293.66, 18.2 
+DATA  2 , 293.66, 18.2 , 369.99, 18.2 
+DATA  9 , 369.99, 2.275 , 369.99, 2.275 ,   0.00, 2.275 , 369.99, 2.275 ,   0.00, 2.275 , 369.99, 2.275 ,   0.00, 2.275 , 369.99, 2.275 , 523.25, 18.2 
+DATA  9 , 587.33, 2.275 , 587.33, 2.275 ,   0.00, 2.275 , 587.33, 2.275 ,   0.00, 2.275 , 587.33, 2.275 ,   0.00, 2.275 , 587.33, 2.275 , 698.46, 18.2 
+
+DATA  8 , 146.83, 2.275 , 110.00, 2.275 , 130.81, 2.275 , 146.83, 2.275 , 130.81, 2.275 , 103.83, 2.275 ,  98.00, 2.275 ,  92.50, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA  8 ,  73.42, 2.275 ,  87.31, 2.275 ,  73.42, 2.275 ,  32.70, 2.275 ,  65.41, 2.275 ,  34.65, 2.275 ,  69.30, 2.275 ,  73.42, 2.275 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+DATA  1 ,   0.00, 18.2 
+
+DATA 0
+
+
 SUB Sleep(s#) STATIC
     endt#=TIMER+s#
     WHILE (TIMER < endt#):WEND
@@ -856,13 +1024,13 @@ END SUB
 
 SUB DrawAim(ang!,vel!,c%) STATIC
     SHARED TxtSW%,TxtSH%
-    
+
     x%=0:y%=SYSTEM(6)/2
     stR=16:enR=16+vel!*8
     enX=x%+COS(ang!)*enR
     enY=y%+SIN(ang!)*enR
     LINE (x%+COS(ang!)*stR, y%+SIN(ang!)*stR)-(enX,enY),c%
-    
+
     LOCATE TxtSH%,1
     PRINT "Ang ";
     PRINT USING "###.#";-ang!*180/3.1416;
@@ -885,4 +1053,5 @@ SUB ReadImageData(img%(1),w%,h%,invert%) STATIC
         FOR i%=0 TO words%-1:img%(i%+2)=NOT img%(i%+2):NEXT i%
     END IF
 END SUB
+
 
