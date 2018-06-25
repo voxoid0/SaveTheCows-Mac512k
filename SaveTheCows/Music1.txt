@@ -66,6 +66,7 @@ DATA -93,-91,-87,-83,-79,-74,-69,-63,-57,-51,-44,-37,-30,-23,-15,-8
     '    p1,p2,p3,p4,p6,p8 correspond to 36.4 ... 4.55 time units
     DATA 0,0,0,0,0,0,0,0,0,0, 36.4,18.2,12.133333,9.1,6.0666667,4.55, 2.275,1.1375,0,0,0
 
+    OPEN "Music1Data.txt" FOR OUTPUT AS 1
 RePlay:
 SOUND RESUME
 RESTORE Song
@@ -78,16 +79,23 @@ NEXT v
 
 Loop:
     SOUND WAIT
+    PRINT
     FOR v=0 TO 3
         t#=VT#(v)
         Fi=-1
         READ p$
-        PRINT p$
-        IF p$="x" THEN RePlay
+        'PRINT p$
+        IF p$="x" THEN CLOSE #1:END ': RePlay
+        di%=0
         FOR I=1 TO LEN(p$)
             Ci=INSTR(C$,MID$(p$,I,1))
             IF Ci>8 THEN 10
-                IF Fi>=0 THEN SOUND F#(Fi),t#,,v: t#=VT#(v)
+                IF Fi>=0 THEN 
+                    dataf#(di%)=F#(Fi)
+                    datat#(di%)=t#
+                    di%=di%+1
+                    SOUND F#(Fi),t#,,v: t#=VT#(v)
+                END IF
                 IF Ci=8 THEN Fi=0 ELSE Fi=CF(Ci)+VO(v)
                 GOTO 50
 10        IF Ci<11 THEN Fi=Fi+CF(Ci): GOTO 50  '# or -
@@ -97,9 +105,26 @@ Loop:
             VT#(v)=CT#(INSTR(C$,MID$(p$,I,1)))
             IF Fi<0 THEN t#=VT#(v)
 50    NEXT I
-        IF Fi>=0 THEN SOUND F#(Fi),t#,,v
+        IF Fi>=0 THEN
+            dataf#(di%)=F#(Fi)
+            datat#(di%)=t#
+            di%=di%+1
+            SOUND F#(Fi),t#,,v
+        END IF
+        
+        PRINT #1, "DATA ";di%;",";
+        FOR d%=0 TO di%-1
+            PRINT #1, USING "#.##";dataf#(d%);
+            PRINT #1, ",";
+            PRINT #1,datat#(d%);",";
+        NEXT d%
+        PRINT #1,
+        
     NEXT v
     SOUND RESUME
+    
+    PRINT #1, ' next group of voices
+    
     GOTO Loop
 
 '    1st 4 numbers are the default octave for each voice (0-7)
