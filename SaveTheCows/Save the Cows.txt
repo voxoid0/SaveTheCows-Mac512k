@@ -48,11 +48,7 @@ CALL ReadImageData(imgBarn%(),BarnW,BarnH,1)
 RESTORE CowData
 CALL ReadImageData(imgCow%(),CowW,CowH,0)
 'GOTO BeatGame
-PRINT "Precalculating gravitation..."
-PRINT "    This will take about 3 minutes! But it's totally worth it..."
-'PRINT "    (Please ignore the math error messages below...)"
 GOSUB InitTornTables
-PRINT "Done."
 RETURN
 
 Title:
@@ -94,7 +90,7 @@ NEXT c%
 k$=INKEY$
 tcowAngSpeed!=3.1416/18!*speed!
 WHILE (MOUSE(0)=-1):WEND
-WHILE(INKEY$="") AND MOUSE(0)=0)
+WHILE(INKEY$="" AND MOUSE(0)=0)
     FOR c%=1 TO ntCows%
         CALL DrawTCow(tcowCY!(c%),tcowRad!(c%),tcowAng!(c%))
         tcowAng!(c%)=tcowAng!(c%)+tcowAngSpeed!
@@ -176,11 +172,13 @@ RETURN
 
 
 InitTornTables:
+PRINT "Precalculating gravitation..."
+PRINT "    This will take a couple of minutes. But it's totally worth it..."
 DEF FNTRad(s%)=(s%+2)*(SH%/48)
 'TTSize=64    ' actually only indices 1-63 are filled, with 32 at center
-TTSize=56
+TTSize=48
 TTSize2=TTSize/2
-TTStep=8 '256/TTSize
+TTStep=12 '256/TTSize
 TTRSize2=TTSize2*TTStep
 DIM tornAX!(2,TTSize,TTSize), tornAY!(3,TTSize,TTSize)
 FOR s%=0 TO 2  ' Each tornado size
@@ -307,8 +305,9 @@ PRINT
 PRINT "CONTROLS:"
 PRINT "Move the mouse to control angle and velocity. Click to throw a cow."
 PRINT
-PRINT "TIP: Use the suction power of the tornados to guide the cows to safety."
-PRINT "Also, don't try this at home."
+PRINT "TIPS: Use the suction power of the tornados to guide the cows to safety."
+PRINT "If a cow touches any part of the barn, it is safe."
+'PRINT "Also, don't try this at the farm."
 PRINT
 GOSUB WaitKey
 RETURN
@@ -316,7 +315,7 @@ RETURN
 WaitKey:
 i$=INKEY$
 WHILE INKEY$<>"" OR MOUSE(0)<>0:WEND
-WHILE INKEY$="":WEND AND MOUSE(0)=0:WEND
+WHILE INKEY$="" AND MOUSE(0)=0:WEND
 WHILE MOUSE(0)=-1:WEND
 RETURN
 
@@ -460,7 +459,7 @@ RETURN
 
 MoveCow:
 IF (cowState$ <> "Flying") THEN RETURN
-GOSUB CalcCowMove 'TornTable
+GOSUB CalcCowMoveTornTable
 IF (cowState$ <> "Flying") THEN RETURN
 'GOSUB DrawFlyingCow
 cowix%=INT(cowX!):cowiy%=INT(cowY!)
@@ -681,13 +680,6 @@ NEXT a!
 BeatGameInitMusic:
 DIM r%(4)
     RESTORE BeatGameInitMusic
-    '    F#() contains frequencies for notes in the diatonic scale
-    '    octave 0, note A = F#(12) = 55 Hz
-    'DIM f#(88)
-    'Log2of27.5# = LOG(27.5#)/LOG(2#)
-    'FOR x%=1 TO 88
-    '    f#(x%) = 2^(Log2of27.5# + x%/12#)
-    'NEXT x%
 
     '    Build fundamental wave form
     '    Controls the quality of the sound
@@ -723,37 +715,12 @@ DATA -93,-91,-87,-83,-79,-74,-69,-63,-57,-51,-44,-37,-30,-23,-15,-8
     WAVE 1,Timbre
     WAVE 2,Timbre
     WAVE 3,Timbre
-    
-    GOTO RePlay
-
-    '    Array CF maps MML commands to frequency indices
-    c$ = "cdefgabp#-12346890<>l"
-    DIM CF(21)
-    FOR i=1 TO 21
-        READ CF(i)
-    NEXT i
-    DATA 0,2,4,5,7,9,11,0,1,-1, 0,0,0,0,0,0,0,0, -12,12,0
-
-    '    Array CT# maps MML commands to duration values
-    DIM CT#(20)
-    FOR i=1 TO 20
-        READ CT#(i)
-    NEXT i
-    '    p1,p2,p3,p4,p6,p8 correspond to 36.4 ... 4.55 time units
-    DATA 0,0,0,0,0,0,0,0,0,0, 36.4,18.2,12.133333,9.1,6.0666667,4.55, 2.275,1.1375,0,0,0
 
 RePlay:
 SOUND RESUME
-RESTORE Song
-
-'    Array VO contains the default octave for a voice
-FOR v=0 TO 3
-  READ VO(v)
-  VO(v)=12*VO(v) + 3
-NEXT v
-
 RESTORE SongDataRaw
 cc%=0
+
 BeatGameMusicLoop:
     IF (INKEY$=CHR$(27)) THEN END
     c%=(cc%/2) MOD nCows% + 1
@@ -775,83 +742,6 @@ BeatGameMusicLoop:
     NEXT v
     SOUND RESUME
     GOTO BeatGameMusicLoop
-
-
-Old:
-    SOUND WAIT
-    FOR v=0 TO 3
-        t#=VT#(v)
-        Fi=-1
-        READ p$
-        IF p$="x" THEN RePlay
-        FOR i=1 TO LEN(p$)
-            Ci=INSTR(c$,MID$(p$,i,1))
-            IF Ci>8 THEN 10
-                IF Fi>=0 THEN SOUND f#(Fi),t#,,v: t#=VT#(v)
-                IF Ci=8 THEN Fi=0 ELSE Fi=CF(Ci)+VO(v)
-                GOTO 50
-10        IF Ci<11 THEN Fi=Fi+CF(Ci): GOTO 50  '# or -
-            IF Ci<19 THEN t#=CT#(Ci): GOTO 50  '1 through 8
-            IF Ci<21 THEN VO(v)=VO(v)+CF(Ci): GOTO 50  '< or >
-            i=i+1  'ln
-            VT#(v)=CT#(INSTR(c$,MID$(p$,i,1)))
-            IF Fi<0 THEN t#=VT#(v)
-50    NEXT i
-        IF Fi>=0 THEN SOUND f#(Fi),t#,,v
-    NEXT v
-    SOUND RESUME
-    GOTO BeatGameMusicLoop
-
-'    1st 4 numbers are the default octave for each voice (0-7)
-'    ln changes the duration for subsequent notes in this voice.
-'    l1 = full note, l2 = half note, l4 = quarter notes etc.
-'    > increments the octave for this voice
-'    < decrements the octave for this voice
-'    a through g plays that note.
-'    They may be followed by # (sharp) or -(flat).
-'    They may also be followed by a digit which specifies
-'    the duration for that note.
-'    p causes a pause, or rest.
-
-Song:
-DATA 1,3,3,3
-
-'Section 1
-DATA l4gb,l9pgb>cc#deg,l2p,l2p
-DATA >cc#,gdege<b-ag,l2p,l2p
-DATA de,b>cc#d<bged,l2p,l2p
-DATA l8<al9p>dpl8<dl9p,egeb-pl8al9p,l9pppc#pl8cl9p,l2p
-
-DATA l4gb,l9pgb>cc#deg,l2p,l2p
-DATA >cc#,gdege<b-ag,l2p,l2p
-DATA de,b>cc#d<bged,l2p,l2p
-DATA l9<a>dpl4<gl9p,b-apl4gl9p,l9c#cpl4<bl9p>,l2p
-
-DATA <l9gp>gp<bp>bp,l9pgb>cc#deg,l2p,l2p
-DATA <>cp>cp<c#p>c#p,gdege<b-ag,l2p,l2p
-DATA <dp>dp<ep>ep,b>cc#d<bged,l2p,l2p
-DATA <l9<a>ap>dpl8<dl9p,egeb-pl8al9p,l9pppc#pl8cl9p,l2p
-
-DATA <l9gp>gp<bp>bp,l9pgb>cc#deg,l2p,l2p
-DATA <>cp>cp<c#p>c#p,gdege<b-ag,l2p,l2p
-DATA <dp>dp<ep>ep,b>cc#d<bged,l2p,l2p
-DATA l9<adpl4gl9p,b-apl4gl9p,l9c#cpl8<bl9ged,l2p
-
-' Section 2
-DATA l9cppcpppp,l9cppcppp,l9egpgpged,l9eppepppp
-DATA c#ppc#pppp,<b-ppb-pppp,egpgpged,eppepppp
-DATA dppdppp,bppbpppp,b>dpdpd#ef,gppgpppp
-DATA <g>gl8fed,>>c#ddpl8ef,fee-d<b-aa-g,l8gggg
-
-DATA l9cppcpppp,l9cppcppp,l9gepgpded,l9eppepppp
-DATA c#ppc#pppp,<b-ppb-pppp,gepgpede,eppepppp
-DATA dppdppp,bppbpppp,b>dpdpdpd,gppgpppp
-DATA ddpdpdpdl2>>d,l2df#,f#f#pf#pf#pf#l2>c,>ddpdpdpdl2f
-DATA l9<d<a>cdc<a-gf#,l2p,l2p,l2p
-DATA dfd<c>c<c#>c#d,l2p,l2p,l2p
-
-DATA x
-' *************************************
 
 SongDataRaw:
 DATA  2 ,  98.00, 9.1 , 123.47, 9.1 
@@ -1007,7 +897,7 @@ END SUB
 
 SUB DrawCowStack(x%,y%,nCows%) STATIC
 SHARED imgCow%(),CowW,CowH
-    LINE(x%,y%)-(x%+CowW,y%-CowH*8),0,BF
+    LINE(x%,y%)-(x%+CowW,y%-CowH*4),0,BF
     FOR c%=1 TO nCows%
         cy%=y% - (c%+1)*CowH
         PUT (x%,cy%), imgCow%,OR
