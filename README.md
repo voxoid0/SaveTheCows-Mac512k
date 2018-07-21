@@ -2,9 +2,7 @@
 
 A 2018 game for 1984's Macintosh 512k. Why? Because.
 
-
-<iframe width="560" height="315" src="https://www.youtube.com/embed/0Y56OwKnnj8?rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-
+[Watch the amazing video!](https://www.youtube.com/embed/0Y56OwKnnj8?rel=0)
 
 WARNING: Fantasy violence: Flying cows getting pulled into tornados. 
 
